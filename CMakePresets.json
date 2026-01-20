@@ -1,0 +1,42 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "linux-native",
+      "displayName": "Linux Native",
+      "description": "Build for Linux on Linux",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/linux",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/linux"
+      }
+    },
+    {
+      "name": "windows-native",
+      "displayName": "Windows Native",
+      "description": "Build for Windows on Windows",
+      "generator": "MinGW Makefiles",
+      "binaryDir": "${sourceDir}/build/windows",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/windows"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "linux",
+      "configurePreset": "linux-native"
+    },
+    {
+      "name": "windows",
+      "configurePreset": "windows-native"
+    }
+  ]
+}

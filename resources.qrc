@@ -1,0 +1,9 @@
+<RCC>
+    <qresource prefix="/">
+        <file>resources/map.html</file>
+        <file>resources/map.css</file>
+        <file>resources/map.js</file>
+        <file>resources/icons/Aura.png</file>
+        <file>config/tokyo_night.qss</file>
+    </qresource>
+</RCC>

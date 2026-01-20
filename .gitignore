@@ -1,0 +1,20 @@
+# --- General OS Files ---
+
+# --- VS Code ---
+.vscode/
+*.code-workspace
+tmp/
+
+# --- C++ / CMake / Qt (PC User Interface) ---
+build/
+install/
+*.autosave
+*.user
+
+# --- Backup Files ---
+*.Backup
+backup/
+
+# --- Log Files ---
+*.log
+.log/
