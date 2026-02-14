@@ -22,6 +22,7 @@ public:
     void downloadMission();
     
     void sendRtcmData(const QByteArray &data);
+    void setMissionCurrent(int seq);
 
 signals:
     void connectionStatusChanged(bool connected);

@@ -1,5 +1,5 @@
 # --- General OS Files ---
-
+.a*
 # --- VS Code ---
 .vscode/
 *.code-workspace

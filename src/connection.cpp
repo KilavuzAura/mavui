@@ -199,3 +199,15 @@ void Connection::requestMissionItem(int seq) {
     uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
     m_serial->write((char*)buf, len);
 }
+
+void Connection::setMissionCurrent(int seq) {
+    if(!m_connected) return;
+    mavlink_message_t msg;
+    // MAV_CMD_DO_SET_MISSION_CURRENT (224)
+    // Param1: Sequence number
+    mavlink_msg_command_long_pack(255, 0, &msg, m_targetSystem, m_targetComponent, 
+                                  MAV_CMD_DO_SET_MISSION_CURRENT, 0, seq, 0, 0, 0, 0, 0, 0);
+    uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+    uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+    m_serial->write((char*)buf, len);
+}

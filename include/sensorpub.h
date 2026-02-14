@@ -3,7 +3,7 @@
 
 #include <QObject>
 #include <QString>
-#include "common/mavlink.h"
+#include "ardupilotmega/mavlink.h"
 
 struct SensorData {
     int mode = 0;
@@ -35,6 +35,33 @@ struct SensorData {
     double rtkHomeLat = 0;
     double rtkHomeLon = 0;
     bool rtkHomeSet = false;
+
+    // Altitude
+    double homeAlt = 0;
+    double vehicleAltMsl = 0;
+
+    // GPS extras
+    float gps_cog = 0;
+    float gps_hdg_acc = 0;
+    float gps_eph = 0;
+    float gps_epv = 0;
+
+    // Magnetic field (SCALED_IMU)
+    int16_t mag_x = 0;
+    int16_t mag_y = 0;
+    int16_t mag_z = 0;
+
+    // NAV controller (NAV_CONTROLLER_OUTPUT)
+    float nav_roll = 0;
+    float nav_pitch = 0;
+    int16_t nav_bearing = 0;
+    float xtrack_error = 0;
+
+    // PID tuning (PID_TUNING)
+    float pidP = 0;
+    float pidI = 0;
+    float pidD = 0;
+    uint8_t pidAxis = 0;
 };
 
 class SensorPub : public QObject {
@@ -57,6 +84,9 @@ private:
     void processGpsRawInt(const mavlink_message_t &msg);
     void processGpsInput(const mavlink_message_t &msg);
     void processStatustext(const mavlink_message_t &msg);
+    void processScaledImu(const mavlink_message_t &msg);
+    void processNavControllerOutput(const mavlink_message_t &msg);
+    void processPidTuning(const mavlink_message_t &msg);
 };
 
 #endif

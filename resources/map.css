@@ -78,3 +78,40 @@ body {
 .popup-btn:hover { 
     opacity: 0.9; 
 }
+.leaflet-bar {
+    border: 1px solid #565f89 !important;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important;
+}
+.leaflet-bar a {
+    background-color: #1a1b26 !important;
+    color: #7aa2f7 !important;
+    border-bottom: 1px solid #565f89 !important;
+}
+.leaflet-bar a:hover {
+    background-color: #24283b !important;
+    color: #bb9af7 !important;
+}
+.leaflet-bar a:last-child {
+    border-bottom: none !important;
+}
+.leaflet-control-layers {
+    background-color: #1a1b26 !important;
+    color: #a9b1d6 !important;
+    border: 1px solid #565f89 !important;
+}
+.leaflet-control-layers-separator {
+    border-top: 1px solid #565f89 !important;
+}
+.leaflet-control-attribution {
+    background-color: rgba(26, 27, 38, 0.85) !important;
+    color: #565f89 !important;
+}
+.leaflet-control-attribution a {
+    color: #7aa2f7 !important;
+}
+.leaflet-control-scale-line {
+    background: rgba(26, 27, 38, 0.85) !important;
+    border: 2px solid #565f89 !important;
+    border-top: none !important;
+    color: #a9b1d6 !important;
+}

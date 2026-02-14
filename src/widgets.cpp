@@ -3,6 +3,7 @@
 #include <QPainter>
 #include <QPen>
 #include <QPainterPath>
+#include <QPolygon>
 #include <cmath>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -14,6 +15,8 @@
 #include <QUrl>
 #include <QMouseEvent>
 #include <QScrollArea>
+#include <QHBoxLayout>
+#include <QVBoxLayout>
 
 #ifdef USE_WEBENGINE
     #include <QWebEngineView>
@@ -63,12 +66,56 @@ void PFDWidget::paintEvent(QPaintEvent *) {
     p.save(); 
     p.rotate(-m_roll); 
     p.translate(0, m_pitch * 4);
-    p.fillRect(-r*4, -r*4, r*8, r*4, QColor(0, 120, 200)); 
-    p.fillRect(-r*4, 0, r*8, r*4, QColor(34, 139, 34)); 
-    p.setPen(QPen(Qt::white, 2)); p.drawLine(-r*4, 0, r*4, 0); 
+    p.fillRect(-r*10, -r*10, r*20, r*10, QColor(0, 120, 200)); 
+    p.fillRect(-r*10, 0, r*20, r*10, QColor(34, 139, 34)); 
+    p.setPen(QPen(Qt::white, 2)); p.drawLine(-r*10, 0, r*10, 0); 
+    
+    // Pitch Ladder (Aci Merdiveni)
+    p.setPen(QPen(Qt::white, 1));
+    p.setFont(QFont("Arial", 7));
+    for (int i = -90; i <= 90; i += 10) {
+        if (i == 0) continue;
+        int y = -i * 4;
+        int len = (i % 30 == 0) ? 30 : 15;
+        p.drawLine(-len, y, len, y);
+        p.drawText(len + 5, y + 4, QString::number(qAbs(i)));
+        p.drawText(-len - 20, y + 4, QString::number(qAbs(i)));
+    }
     p.restore();
-    p.setPen(QPen(Qt::black, 3)); 
-    p.drawLine(-20, 0, -5, 0); p.drawLine(5, 0, 20, 0); p.drawPoint(0, 0);
+
+    // Roll Scale (Yatis Gostergesi)
+    p.save();
+    p.rotate(-m_roll);
+    int r_roll = r - 15;
+    p.setPen(QPen(Qt::white, 2));
+    p.drawArc(-r_roll, -r_roll, 2*r_roll, 2*r_roll, 30 * 16, 120 * 16);
+    
+    int angles[] = {-60, -45, -30, -20, -10, 0, 10, 20, 30, 45, 60};
+    for(int a : angles) {
+        p.save();
+        p.rotate(a);
+        int tickLen = (a % 30 == 0) ? 8 : 4;
+        p.drawLine(0, -r_roll, 0, -r_roll + tickLen);
+        p.restore();
+    }
+    p.setBrush(Qt::white); p.setPen(Qt::NoPen);
+    QPolygon skyPtr;
+    skyPtr << QPoint(0, -r_roll + 8) << QPoint(-4, -r_roll + 16) << QPoint(4, -r_roll + 16);
+    p.drawPolygon(skyPtr);
+    p.restore();
+
+    // Sabit Semboller (Ucak ve Roll İbresi)
+    p.setPen(QPen(Qt::black, 3)); p.setBrush(Qt::NoBrush);
+    p.drawLine(-30, 0, -10, 0); p.drawLine(-10, 0, -10, 10);
+    p.drawLine(30, 0, 10, 0); p.drawLine(10, 0, 10, 10);
+    p.drawPoint(0, 0);
+    
+    p.setPen(QPen(Qt::yellow, 2)); p.setBrush(Qt::yellow);
+    QPolygon rollPtr;
+    int r_ptr = r - 15;
+    rollPtr << QPoint(0, -r_ptr) << QPoint(-5, -r_ptr + 10) << QPoint(5, -r_ptr + 10);
+    p.drawPolygon(rollPtr);
+
     p.setClipping(false); 
     p.setPen(QPen(QColor(200, 200, 200), 3)); 
     p.setBrush(Qt::NoBrush); 
@@ -252,24 +299,36 @@ void MapWidget::onLoadFinished(bool ok) {
 }
 
 void MapWidget::onUrlChanged(const QUrl &url) {
-    QString frag = url.fragment();
-    if(frag.startsWith("addwp:")) {
+    QString urlStr = url.toString();
+    
+    int hashIdx = urlStr.indexOf('#');
+    if (hashIdx == -1) return;
+    
+    QString frag = urlStr.mid(hashIdx + 1);
+    if (frag.isEmpty()) return;
+
+    if (frag.startsWith("addwp:")) {
         QStringList parts = frag.split(":"); 
-        if(parts.size() >= 3) emit waypointClicked(parts[1].toDouble(), parts[2].toDouble());
+        if (parts.size() >= 3) emit waypointClicked(parts[1].toDouble(), parts[2].toDouble());
     }
-    else if(frag.startsWith("addzone:")) {
-        QStringList parts = frag.split(":"); 
-        if(parts.size() >= 3) emit zoneClicked(parts[1].toDouble(), parts[2].toDouble());
+    else if (frag.startsWith("addzone:")) {
+        QStringList parts = frag.split(":");
+        if (parts.size() >= 3) emit zoneClicked(parts[1].toDouble(), parts[2].toDouble());
     }
-    else if(frag.startsWith("copy:")) {
-        QStringList parts = frag.split(":"); 
-        if(parts.size() >= 3) QApplication::clipboard()->setText(parts[1] + ", " + parts[2]);
+    else if (frag.startsWith("copy:")) {
+        QStringList parts = frag.split(":");
+        if (parts.size() >= 3) QApplication::clipboard()->setText(parts[1] + ", " + parts[2]);
     }
-    else if(frag.startsWith("theme:")) {
-        QString themeName = frag.mid(6);
-        themeName = QUrl::fromPercentEncoding(themeName.toUtf8());
+    else if (frag.startsWith("theme:")) {
+        QString themeName = QUrl::fromPercentEncoding(frag.mid(6).toUtf8());
         emit themeChanged(themeName);
     }
+    else if (frag.startsWith("vehiclemoved:")) {
+        QStringList parts = frag.split(":");
+        if (parts.size() >= 3) emit vehicleMoved(parts[1].toDouble(), parts[2].toDouble());
+    }
+
+    m_webView->page()->runJavaScript("window.location.hash = '';");
 }
 
 void MapWidget::runScript(const QString &script) {
@@ -323,6 +382,10 @@ void MapWidget::drawMarkers(const QList<Zone> &zones, const QList<QPointF> &curr
 
 void MapWidget::setClickMode(bool enable) { runScript(QString("setClickMode('%1');").arg(enable ? "waypoint" : "none")); }
 void MapWidget::setZoneMode(bool enable) { runScript(QString("setClickMode('%1');").arg(enable ? "zone" : "none")); }
+
+void MapWidget::setDraggableVehicle(bool enable) {
+    runScript(QString("setVehicleDraggable(%1);").arg(enable ? "true" : "false"));
+}
 
 void MapWidget::setBounds(double trLat, double trLon, double blLat, double blLon) {
     runScript(QString("if(typeof map !== 'undefined') { map.fitBounds([[%1, %2], [%3, %4]]); }")
