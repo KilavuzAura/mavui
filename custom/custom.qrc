@@ -1,0 +1,15 @@
+<RCC>
+    <qresource prefix="/custom/img">
+        <file alias="AuraLogo.png">res/Images/AuraLogo.png</file>
+    </qresource>
+    <qresource prefix="/Custom/qmlimages">
+        <file alias="PaperPlane.svg">res/Images/CustomVehicleIcon.svg</file>
+    </qresource>
+    <qresource prefix="/Custom/res">
+        <file alias="QGCLogoFull.svg">res/AuraLogo.svg</file>
+        <file alias="QGCLogoWhite.svg">res/AuraLogo.svg</file>
+        <file alias="QGCLogoWhite">res/AuraLogo.svg</file>
+        <file alias="QGCLogoBlack.svg">res/AuraLogo.svg</file>
+        <file alias="qgroundcontrol.ico">res/icons/custom_qgroundcontrol.ico</file>
+    </qresource>
+</RCC>
