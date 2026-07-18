@@ -121,6 +121,20 @@ DECLARE_SETTINGGROUP(App, "")
                 }
             }
         #endif
+        #ifdef Q_OS_ANDROID
+        if (rootDirPath.isEmpty()) {
+            // Prefer the shared Documents folder so missions/logs are reachable from
+            // file managers. Requires all-files access, which is requested on first
+            // run; falls through to app-private storage when unavailable.
+            QString publicDocs = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+            if (publicDocs.isEmpty() || publicDocs.contains(QLatin1String("/Android/data/"))) {
+                publicDocs = QStringLiteral("/storage/emulated/0/Documents");
+            }
+            if (QDir().mkpath(publicDocs) && QFileInfo(publicDocs).isWritable()) {
+                rootDirPath = publicDocs;
+            }
+        }
+        #endif
         if (rootDirPath.isEmpty()) {
             rootDirPath = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
         }
