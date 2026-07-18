@@ -26,8 +26,11 @@ static QtMessageHandler defaultHandler = nullptr;
 
 static void msgHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
-    // Filter via QLoggingCategory rules early
-    if (!QLoggingCategory(context.category).isDebugEnabled()) {
+    // Filter via QLoggingCategory rules early. Only debug messages are subject to
+    // category filtering — warnings and errors must always pass through, and
+    // constructing a QLoggingCategory here for every message can deadlock the
+    // category registry when QT_LOGGING_RULES is set.
+    if ((type == QtDebugMsg) && !QLoggingCategory(context.category).isDebugEnabled()) {
         return;
     }
 
@@ -162,7 +165,7 @@ void QGCLogging::_flushToDisk()
 
         const QString saveDirPath = SettingsManager::instance()->appSettings()->crashSavePath();
         const QDir saveDir(saveDirPath);
-        const QString saveFilePath = saveDir.absoluteFilePath("QGCConsole.log");
+        const QString saveFilePath = saveDir.absoluteFilePath(QStringLiteral(QGC_APP_NAME "Console.log"));
 
         _logFile.setFileName(saveFilePath);
         if (!_logFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
