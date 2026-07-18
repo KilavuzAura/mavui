@@ -5,7 +5,7 @@
 <h1 align="center">MavUI</h1>
 
 <p align="center"><b>AURA (KilavuzAura) su altı aracı takımının yer kontrol istasyonu</b><br>
-QGroundControl <code>Stable_V5.0</code> tabanlı özel derleme — ArduSub / Orange Cube+ için ayarlandı.</p>
+QGroundControl <code>Stable_V5.0</code> tabanlı özel derleme — ArduSub için ayarlandı.</p>
 
 ---
 
@@ -15,10 +15,8 @@ QGC'nin resmi **custom build** mekanizması (`custom/` klasörü) ile markalama 
 
 - **AURA markası** — uygulama adı MavUI, Tokyo Night renk paleti, AURA logosu/ikonları
 - **ArduSub odaklı** — çevrimdışı plan düzenleme varsayılanı ArduPilot/Sub, tek araç arayüzü
-- **Çalışan harita** — varsayılan sağlayıcı Esri World Satellite (stok QGC'nin varsayılanı Bing; servis kapandığı için boş harita gösteriyor)
 - **Android dosya erişimi** — sistem dosya seçicisi (SAF) ile cihazın tamamından dosya seçme; ilk açılışta "Tüm dosyalara erişim" izni istenir; uygulama verileri görünür `Documents/MavUI` klasöründe tutulur
 - **Kendi Android kimliği** — `tr.com.aurateam.mavui`, stok QGC ile yan yana kurulabilir
-- **Düzeltmeler** — QtMultimedia video backend'inde açılışta çökme, log handler'ının warning/error yutması, Qt 6.11 / GCC 16 / GStreamer 1.28 derleme uyumu
 
 ## Derleme
 
