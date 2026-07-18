@@ -149,7 +149,14 @@ QGCApplication::QGCApplication(int &argc, char *argv[], bool unitTesting, bool s
     setOrganizationDomain(QGC_ORG_DOMAIN);
     setApplicationVersion(QString(QGC_APP_VERSION_STR));
 #ifdef Q_OS_LINUX
+#ifdef QGC_CUSTOM_BUILD
+    setWindowIcon(QIcon(":/custom/img/AuraLogo.png"));
+#else
     setWindowIcon(QIcon(":/res/qgroundcontrol.ico"));
+#endif
+    // Wayland compositors resolve the taskbar/alt-tab icon through the app_id,
+    // which Qt derives from the desktop file name.
+    setDesktopFileName(QStringLiteral(QGC_APP_NAME));
 #endif
 
     // Set settings format
@@ -692,13 +699,23 @@ bool QGCApplication::compressEvent(QEvent *event, QObject *receiver, QPostEventL
         return QApplication::compressEvent(event, receiver, postedEvents);
     }
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 11, 0)
+    // QMetaCallEvent::id() was removed in Qt 6.11; its protected Data is reachable from a derived helper.
+    struct MetaCallHelper : public QMetaCallEvent {
+        int id() const { return d.method_offset_ + d.method_relative_; }
+    };
+    const auto methodId = [](const QMetaCallEvent *e) { return static_cast<const MetaCallHelper*>(e)->id(); };
+#else
+    const auto methodId = [](const QMetaCallEvent *e) { return e->id(); };
+#endif
+
     for (QPostEventList::iterator it = postedEvents->begin(); it != postedEvents->end(); ++it) {
         QPostEvent &cur = *it;
         if (cur.receiver != receiver || cur.event == 0 || cur.event->type() != event->type()) {
             continue;
         }
         const QMetaCallEvent *cur_mce = static_cast<QMetaCallEvent*>(cur.event);
-        if (cur_mce->sender() != mce->sender() || cur_mce->signalId() != mce->signalId() || cur_mce->id() != mce->id()) {
+        if (cur_mce->sender() != mce->sender() || cur_mce->signalId() != mce->signalId() || methodId(cur_mce) != methodId(mce)) {
             continue;
         }
         /* Keep The Newest Call */
