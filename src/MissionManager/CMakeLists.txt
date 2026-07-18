@@ -61,6 +61,8 @@ target_sources(${CMAKE_PROJECT_NAME}
         StructureScanComplexItem.h
         StructureScanPlanCreator.cc
         StructureScanPlanCreator.h
+        StarMissionOnePlanCreator.cc
+        StarMissionOnePlanCreator.h
         SurveyComplexItem.cc
         SurveyComplexItem.h
         SurveyPlanCreator.cc

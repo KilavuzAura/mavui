@@ -20,6 +20,7 @@
 #include "SurveyPlanCreator.h"
 #include "StructureScanPlanCreator.h"
 #include "CorridorScanPlanCreator.h"
+#include "StarMissionOnePlanCreator.h"
 #include "BlankPlanCreator.h"
 #include "QmlObjectListModel.h"
 #include "GeoFenceManager.h"
@@ -621,21 +622,28 @@ void PlanMasterController::_updateOverallDirty(void)
 void PlanMasterController::_updatePlanCreatorsList(void)
 {
     if (!_flyView) {
+        // Order: Blank, Survey, Corridor, [StructureScan for non-fixed-wing], StarMissionOne (always last).
+        const int structureScanIndex = 3;
+
         if (!_planCreators) {
             _planCreators = new QmlObjectListModel(this);
             _planCreators->append(new BlankPlanCreator(this, this));
             _planCreators->append(new SurveyPlanCreator(this, this));
             _planCreators->append(new CorridorScanPlanCreator(this, this));
+            _planCreators->append(new StarMissionOnePlanCreator(this, this));
             emit planCreatorsChanged(_planCreators);
         }
 
+        // StructureScan is only supported for non-fixed-wing vehicles. Keep it
+        // inserted just before the trailing Star Mission One entry when applicable.
+        const bool haveStructureScan = _planCreators->count() == 5;
         if (_managerVehicle->fixedWing()) {
-            if (_planCreators->count() == 4) {
-                _planCreators->removeAt(_planCreators->count() - 1);
+            if (haveStructureScan) {
+                _planCreators->removeAt(structureScanIndex);
             }
         } else {
-            if (_planCreators->count() != 4) {
-                _planCreators->append(new StructureScanPlanCreator(this, this));
+            if (!haveStructureScan) {
+                _planCreators->insert(structureScanIndex, new StructureScanPlanCreator(this, this));
             }
         }
     }

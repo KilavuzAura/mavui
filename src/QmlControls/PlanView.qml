@@ -49,6 +49,9 @@ Item {
     property bool   _lightWidgetBorders:                editorMap.isSatelliteMap
     property bool   _addROIOnClick:                     false
     property bool   _singleComplexItem:                 _missionController.complexMissionItemNames.length === 1
+    property bool   _starMissionMode:                   false   ///< Star Mission One placement mode active
+    property bool   _starMissionHomeSet:                false   ///< first map click in the mode sets home, rest add targets
+    property var    _starMissionCreator:                null    ///< the StarMissionOne plan creator (for the table entry path)
      property int    _editingLayer:                      {if(!_utmspEnabled){layerTabBar.currentIndex ? _layers[layerTabBar.currentIndex] : _layerMission}else{layerTabBarUTMSP.currentIndex ? _layersUTMSP[layerTabBarUTMSP.currentIndex] : _layerMission}}
     property int    _toolStripBottom:                   toolStrip.height + toolStrip.y
     property var    _appSettings:                       QGroundControl.settingsManager.appSettings
@@ -266,6 +269,64 @@ Item {
         _missionController.insertSimpleMissionItem(coordinate, nextIndex, true /* makeCurrentItem */)
     }
 
+    // ---- Star Mission One placement mode ----
+    function _startStarMissionMode(creator) {
+        _starMissionCreator = creator
+        _planMasterController.removeAll()
+        _starMissionHomeSet = false
+        _starMissionMode    = true
+    }
+
+    function _exitStarMissionMode() {
+        _starMissionMode = false
+        _starMissionHomeSet = false
+    }
+
+    function _cancelStarMissionMode() {
+        _planMasterController.removeAll()
+        _exitStarMissionMode()
+    }
+
+    // Handles a map click while in Star Mission One mode: first click places the
+    // home position, every following click adds a target waypoint (camera on by default).
+    function _starMissionMapClick(coordinate) {
+        if (!_starMissionHomeSet) {
+            var settingsItem = _visualItems.get(0)   // index 0 is always the mission settings (home) item
+            if (settingsItem) {
+                settingsItem.coordinate = coordinate
+            }
+            _starMissionHomeSet = true
+        } else {
+            var item = _missionController.insertSimpleMissionItem(coordinate, -1, true /* makeCurrentItem */)
+            if (item && item.cameraSection) {
+                item.cameraSection.cameraAction.rawValue = 6 // CameraSection::TakePhoto — camera on by default
+            }
+        }
+    }
+
+    // Reads the placed home + target waypoints and expands them into the full
+    // dive/surface/photo pattern via the plan creator.
+    function _finishStarMissionMode() {
+        if (!_starMissionCreator || !_starMissionHomeSet) {
+            _exitStarMissionMode()
+            return
+        }
+        var home = _visualItems.get(0).coordinate
+        var targets = []
+        for (var i = 1; i < _visualItems.count; i++) {
+            var it = _visualItems.get(i)
+            if (!it.specifiesCoordinate) {
+                continue
+            }
+            var camera = it.cameraSection ? (it.cameraSection.cameraAction.rawValue === 6) : false
+            targets.push({ coordinate: it.coordinate, camera: camera, yaw: -1 })
+        }
+        _exitStarMissionMode()
+        if (targets.length > 0) {
+            _starMissionCreator.createFullPlan(home, targets)
+        }
+    }
+
     function insertROIAfterCurrent(coordinate) {
         var nextIndex = _missionController.currentPlanViewVIIndex + 1
         _missionController.insertROIMissionItem(coordinate, nextIndex, true /* makeCurrentItem */)
@@ -381,7 +442,12 @@ Item {
 				if(_utmspEnabled){
                 	QGroundControl.utmspManager.utmspVehicle.updateLastCoordinates(coordinate.latitude, coordinate.longitude)
                 }
-                
+
+                if (_starMissionMode) {
+                    _starMissionMapClick(coordinate)
+                    return
+                }
+
                 switch (_editingLayer) {
                 case _layerMission:
                     if (addWaypointRallyPointAction.checked) {
@@ -665,6 +731,63 @@ Item {
         }
 
         //-----------------------------------------------------------
+        // Star Mission One mode banner (top of map). Only visible while placing.
+        Rectangle {
+            id:                         starMissionBanner
+            anchors.top:                parent.top
+            anchors.topMargin:          _toolsMargin
+            anchors.horizontalCenter:   parent.horizontalCenter
+            z:                          QGroundControl.zOrderWidgets
+            visible:                    _starMissionMode
+            width:                      starMissionBannerRow.width + (ScreenTools.defaultFontPixelWidth * 3)
+            height:                     starMissionBannerRow.height + (ScreenTools.defaultFontPixelHeight)
+            radius:                     ScreenTools.defaultFontPixelHeight / 2
+            color:                      qgcPal.window
+            border.color:               qgcPal.buttonHighlight
+            border.width:               1
+
+            RowLayout {
+                id:                 starMissionBannerRow
+                anchors.centerIn:   parent
+                spacing:            ScreenTools.defaultFontPixelWidth
+
+                QGCLabel {
+                    text:       qsTr("Star Mission One")
+                    font.bold:  true
+                }
+
+                QGCLabel {
+                    text:               _starMissionHomeSet
+                                            ? qsTr("Click map to add targets")
+                                            : qsTr("Click map to set Home position")
+                    color:              qgcPal.colorGrey
+                    font.pointSize:     ScreenTools.smallFontPointSize
+                }
+
+                QGCButton {
+                    text:       qsTr("Table")
+                    onClicked:  starMissionOneDialog.createObject(mainWindow, { mapCenter: _mapCenter(), planCreator: _starMissionCreator }).open()
+
+                    function _mapCenter() {
+                        var centerPoint = Qt.point(editorMap.centerViewport.left + (editorMap.centerViewport.width / 2), editorMap.centerViewport.top + (editorMap.centerViewport.height / 2))
+                        return editorMap.toCoordinate(centerPoint, false /* clipToViewPort */)
+                    }
+                }
+
+                QGCButton {
+                    text:       qsTr("Finish")
+                    primary:    true
+                    onClicked:  _finishStarMissionMode()
+                }
+
+                QGCButton {
+                    text:       qsTr("Cancel")
+                    onClicked:  _cancelStarMissionMode()
+                }
+            }
+        }
+
+        //-----------------------------------------------------------
         // Right pane for mission editing controls
         Rectangle {
             id:                 rightPanel
@@ -894,6 +1017,75 @@ Item {
         }
     }
 
+    Component {
+        id: starMissionOneDialog
+
+        QGCPopupDialog {
+            title:      qsTr("Star Mission One")
+            buttons:    Dialog.Ok | Dialog.Cancel
+
+            property var planCreator
+            property var mapCenter
+
+            function _coord(latField, lonField) {
+                return QtPositioning.coordinate(parseFloat(latField.text), parseFloat(lonField.text))
+            }
+
+            function _yaw(camCheck, yawField) {
+                return (camCheck.checked && yawField.text.length > 0) ? parseFloat(yawField.text) : -1
+            }
+
+            onAccepted: {
+                var targets = [
+                    { coordinate: _coord(wp1Lat, wp1Lon), camera: wp1Cam.checked, yaw: _yaw(wp1Cam, wp1Yaw) },
+                    { coordinate: _coord(wp2Lat, wp2Lon), camera: wp2Cam.checked, yaw: _yaw(wp2Cam, wp2Yaw) },
+                    { coordinate: _coord(wp3Lat, wp3Lon), camera: wp3Cam.checked, yaw: _yaw(wp3Cam, wp3Yaw) }
+                ]
+                _exitStarMissionMode()
+                planCreator.createFullPlan(_coord(homeLat, homeLon), targets)
+            }
+
+            GridLayout {
+                columns:        5
+                columnSpacing:  ScreenTools.defaultFontPixelWidth
+                rowSpacing:     ScreenTools.defaultFontPixelHeight / 2
+
+                property real _latLonWidth: ScreenTools.defaultFontPixelWidth * 12
+                property real _yawWidth:    ScreenTools.defaultFontPixelWidth * 7
+
+                QGCLabel { text: qsTr("Position"); font.bold: true }
+                QGCLabel { text: qsTr("Lat"); font.bold: true }
+                QGCLabel { text: qsTr("Lon"); font.bold: true }
+                QGCLabel { text: qsTr("Camera"); font.bold: true }
+                QGCLabel { text: qsTr("Yaw (°)"); font.bold: true }
+
+                QGCLabel { text: qsTr("Home") }
+                QGCTextField { id: homeLat; Layout.preferredWidth: parent._latLonWidth; text: mapCenter ? mapCenter.latitude.toFixed(7) : "" }
+                QGCTextField { id: homeLon; Layout.preferredWidth: parent._latLonWidth; text: mapCenter ? mapCenter.longitude.toFixed(7) : "" }
+                Item { Layout.preferredWidth: 1 }
+                Item { Layout.preferredWidth: 1 }
+
+                QGCLabel { text: qsTr("Waypoint 1") }
+                QGCTextField { id: wp1Lat; Layout.preferredWidth: parent._latLonWidth; placeholderText: qsTr("Lat") }
+                QGCTextField { id: wp1Lon; Layout.preferredWidth: parent._latLonWidth; placeholderText: qsTr("Lon") }
+                QGCCheckBox   { id: wp1Cam; text: qsTr("On"); checked: true }
+                QGCTextField { id: wp1Yaw; Layout.preferredWidth: parent._yawWidth; enabled: wp1Cam.checked; placeholderText: qsTr("auto") }
+
+                QGCLabel { text: qsTr("Waypoint 2") }
+                QGCTextField { id: wp2Lat; Layout.preferredWidth: parent._latLonWidth; placeholderText: qsTr("Lat") }
+                QGCTextField { id: wp2Lon; Layout.preferredWidth: parent._latLonWidth; placeholderText: qsTr("Lon") }
+                QGCCheckBox   { id: wp2Cam; text: qsTr("On"); checked: true }
+                QGCTextField { id: wp2Yaw; Layout.preferredWidth: parent._yawWidth; enabled: wp2Cam.checked; placeholderText: qsTr("auto") }
+
+                QGCLabel { text: qsTr("Waypoint 3") }
+                QGCTextField { id: wp3Lat; Layout.preferredWidth: parent._latLonWidth; placeholderText: qsTr("Lat") }
+                QGCTextField { id: wp3Lon; Layout.preferredWidth: parent._latLonWidth; placeholderText: qsTr("Lon") }
+                QGCCheckBox   { id: wp3Cam; text: qsTr("On"); checked: true }
+                QGCTextField { id: wp3Yaw; Layout.preferredWidth: parent._yawWidth; enabled: wp3Cam.checked; placeholderText: qsTr("auto") }
+            }
+        }
+    }
+
     function clearButtonClicked() {
         mainWindow.showMessageDialog(qsTr("Clear"),
                                      qsTr("Are you sure you want to remove all mission items and clear the mission from the vehicle?"),
@@ -1030,7 +1222,9 @@ Item {
                             hoverEnabled:       true
                             preventStealing:    true
                             onClicked:          {
-                                if (_planMasterController.containsItems) {
+                                if (object.interactive) {
+                                    _startStarMissionMode(object)
+                                } else if (_planMasterController.containsItems) {
                                     createPlanRemoveAllPromptDialog.createObject(mainWindow, { mapCenter: _mapCenter(), planCreator: object }).open()
                                 } else {
                                     object.createPlan(_mapCenter())
