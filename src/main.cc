@@ -32,6 +32,7 @@
 #ifdef Q_OS_LINUX
 #ifndef Q_OS_ANDROID
     #include "SignalHandler.h"
+    #include <unistd.h>
 #endif
 #endif
 
@@ -128,8 +129,9 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef Q_OS_UNIX
-    if (!qEnvironmentVariableIsSet("QT_LOGGING_TO_CONSOLE")) {
-        qputenv("QT_LOGGING_TO_CONSOLE", "1");
+    // QT_LOGGING_TO_CONSOLE is deprecated since Qt 6.11 and triggers a startup warning
+    if (!qEnvironmentVariableIsSet("QT_FORCE_STDERR_LOGGING")) {
+        qputenv("QT_FORCE_STDERR_LOGGING", "1");
     }
 #endif
 

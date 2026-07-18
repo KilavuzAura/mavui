@@ -202,6 +202,7 @@ find_package(Qt6
         Xml
     OPTIONAL_COMPONENTS
         Bluetooth
+        LocationPrivate # Qt >= 6.9 ships it as its own package; on 6.8 the Location package provides the target
         MultimediaQuickPrivate
         Quick3D
         SerialPort
