@@ -23,6 +23,14 @@ const QString StarMissionOnePlanCreator::name = QStringLiteral("Star Mission One
 namespace {
 // Movement pattern constants — kept in sync with tools/aura_foto_plan_uret.py.
 constexpr double kCruiseDepth   = -1.0; // fixed cruise depth (m, negative = below surface)
+// Surface waypoints are -0.1 m, NOT 0. Frame 3 altitudes are relative to HOME,
+// and home is captured where the vehicle floats, so alt = 0 asks for a target at
+// (or above) the waterline: the sub can never reach it, pins the vertical
+// thrusters at full and hovers ~0.4 m down, taking the photo underwater. -0.1 m
+// also keeps the depth sensor submerged (hull ~35 cm, sensor at mid height) while
+// the camera on top clears the water. Matches aura_foto_plan_uret.py /
+// gorev_yukle.py (SATIH_DERINLIK).
+constexpr double kSurfaceDepth  = -0.1; // surface waypoint depth (m, negative)
 constexpr int    kSurfaceSettle = 1;    // seconds to settle after surfacing
 constexpr int    kPhotoBefore   = 3;    // seconds to wait before the photo
 constexpr int    kPhotoAfter    = 2;    // seconds to wait after the photo
@@ -115,7 +123,7 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate& home, const
 
         b.cruise(prevLat, prevLon);                 // 1) dive in place at the previous position
         b.cruise(lat, lon);                         // 2) travel to the target at depth
-        b.waypoint(lat, lon, 0.0, kSurfaceSettle);  // 3) surface and settle
+        b.waypoint(lat, lon, kSurfaceDepth, kSurfaceSettle);  // 3) surface and settle
 
         if (camera) {
             int window = kPhotoBefore + kPhotoAfter;
@@ -126,7 +134,7 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate& home, const
             }
             b.command(kCmdConditionDelay, QJsonArray({ kPhotoBefore, 0, 0, 0, 0, 0, 0 })); // 5) wait
             b.command(kCmdDoDigicamControl, QJsonArray({ 0, 0, 0, 0, 1, 0, 0 }));          // 6) take photo
-            b.waypoint(lat, lon, 0.0, window);                                                   // 7) hold the photo window
+            b.waypoint(lat, lon, kSurfaceDepth, window);                                          // 7) hold the photo window
         }
 
         prevLat = lat;
@@ -135,7 +143,7 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate& home, const
 
     b.cruise(prevLat, prevLon);                      // dive in place at the last target
     b.cruise(home.latitude(), home.longitude());     // return to home underwater
-    b.waypoint(home.latitude(), home.longitude(), 0.0); // surface, mission complete
+    b.waypoint(home.latitude(), home.longitude(), kSurfaceDepth); // surface, mission complete
 
     QJsonObject mission;
     mission[QStringLiteral("cruiseSpeed")]            = 15;
