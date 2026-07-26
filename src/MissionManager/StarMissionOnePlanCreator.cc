@@ -18,11 +18,14 @@
 #include <QtCore/QTemporaryFile>
 #include <QtCore/QDir>
 
+#include <cmath>
+
 const QString StarMissionOnePlanCreator::name = QStringLiteral("Star Mission One");
 
 namespace {
 // Movement pattern constants — kept in sync with tools/aura_foto_plan_uret.py.
-constexpr double kCruiseDepth   = -1.0; // fixed cruise depth (m, negative = below surface)
+// The cruise depth is no longer fixed: it comes from the UI (banner / table box)
+// and falls back to StarMissionOnePlanCreator::kDefaultCruiseDepth (-1 m).
 // Surface waypoints are -0.1 m, NOT 0. Frame 3 altitudes are relative to HOME,
 // and home is captured where the vehicle floats, so alt = 0 asks for a target at
 // (or above) the waterline: the sub can never reach it, pins the vertical
@@ -53,9 +56,11 @@ constexpr int kFrameMission           = 2;
 class PatternBuilder
 {
 public:
+    explicit PatternBuilder(double cruiseDepth) : _cruiseDepth(cruiseDepth) {}
+
     // Cruise waypoint at depth (frame 3, negative altitude).
     void cruise(double lat, double lon, int hold = 0) {
-        waypoint(lat, lon, kCruiseDepth, hold);
+        waypoint(lat, lon, _cruiseDepth, hold);
     }
 
     // Surface/absolute-depth waypoint (frame 3).
@@ -92,6 +97,7 @@ private:
 
     QJsonArray _items;
     int        _jumpId = 1;
+    double     _cruiseDepth;
 };
 } // namespace
 
@@ -106,13 +112,19 @@ void StarMissionOnePlanCreator::createPlan(const QGeoCoordinate& /*mapCenterCoor
     // Interactive: the real work happens once the placement mode has the coordinates.
 }
 
-void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate& home, const QVariantList& targets)
+void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate& home, const QVariantList& targets, double cruiseDepth)
 {
     if (!home.isValid() || targets.isEmpty()) {
         return;
     }
 
-    PatternBuilder b;
+    // Depth must be negative (below surface). A blank/zero/positive box means
+    // "use the default" rather than driving the vehicle above the waterline.
+    if (!std::isfinite(cruiseDepth) || cruiseDepth >= 0.0) {
+        cruiseDepth = kDefaultCruiseDepth;
+    }
+
+    PatternBuilder b(cruiseDepth);
     double prevLat = home.latitude();
     double prevLon = home.longitude();
 

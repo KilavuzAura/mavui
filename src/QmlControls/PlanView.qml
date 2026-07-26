@@ -304,6 +304,17 @@ Item {
         }
     }
 
+    // Cruise depth from a UI text box: empty/invalid falls back to -1 m and a
+    // positive number is read as a depth (the vehicle must never be sent above
+    // the surface). Kept in one place so the banner and the table agree.
+    function _starMissionDepth(depthText) {
+        var depth = parseFloat(depthText)
+        if (isNaN(depth) || depth === 0) {
+            return -1.0
+        }
+        return depth > 0 ? -depth : depth
+    }
+
     // Reads the placed home + target waypoints and expands them into the full
     // dive/surface/photo pattern via the plan creator.
     function _finishStarMissionMode() {
@@ -321,9 +332,10 @@ Item {
             var camera = it.cameraSection ? (it.cameraSection.cameraAction.rawValue === 6) : false
             targets.push({ coordinate: it.coordinate, camera: camera, yaw: -1 })
         }
+        var depth = _starMissionDepth(starMissionDepthField.text)
         _exitStarMissionMode()
         if (targets.length > 0) {
-            _starMissionCreator.createFullPlan(home, targets)
+            _starMissionCreator.createFullPlan(home, targets, depth)
         }
     }
 
@@ -764,9 +776,18 @@ Item {
                     font.pointSize:     ScreenTools.smallFontPointSize
                 }
 
+                QGCLabel { text: qsTr("Depth (m)") }
+
+                QGCTextField {
+                    id:                     starMissionDepthField
+                    Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 8
+                    placeholderText:        qsTr("-1.0")
+                    // Empty box = -1 m (see _starMissionDepth); negative = below surface.
+                }
+
                 QGCButton {
                     text:       qsTr("Table")
-                    onClicked:  starMissionOneDialog.createObject(mainWindow, { mapCenter: _mapCenter(), planCreator: _starMissionCreator }).open()
+                    onClicked:  starMissionOneDialog.createObject(mainWindow, { mapCenter: _mapCenter(), planCreator: _starMissionCreator, depthText: starMissionDepthField.text }).open()
 
                     function _mapCenter() {
                         var centerPoint = Qt.point(editorMap.centerViewport.left + (editorMap.centerViewport.width / 2), editorMap.centerViewport.top + (editorMap.centerViewport.height / 2))
@@ -1024,64 +1045,109 @@ Item {
             title:      qsTr("Star Mission One")
             buttons:    Dialog.Ok | Dialog.Cancel
 
-            property var planCreator
-            property var mapCenter
+            property var    planCreator
+            property var    mapCenter
+            property string depthText:  ""      ///< seeded from the banner depth box
+            property int    wpCount:    3       ///< grown by the "+ Waypoint" button
 
-            function _coord(latField, lonField) {
-                return QtPositioning.coordinate(parseFloat(latField.text), parseFloat(lonField.text))
-            }
+            property real _labelWidth:  ScreenTools.defaultFontPixelWidth * 12
+            property real _latLonWidth: ScreenTools.defaultFontPixelWidth * 12
+            property real _yawWidth:    ScreenTools.defaultFontPixelWidth * 7
 
-            function _yaw(camCheck, yawField) {
-                return (camCheck.checked && yawField.text.length > 0) ? parseFloat(yawField.text) : -1
+            function _coord(latText, lonText) {
+                return QtPositioning.coordinate(parseFloat(latText), parseFloat(lonText))
             }
 
             onAccepted: {
-                var targets = [
-                    { coordinate: _coord(wp1Lat, wp1Lon), camera: wp1Cam.checked, yaw: _yaw(wp1Cam, wp1Yaw) },
-                    { coordinate: _coord(wp2Lat, wp2Lon), camera: wp2Cam.checked, yaw: _yaw(wp2Cam, wp2Yaw) },
-                    { coordinate: _coord(wp3Lat, wp3Lon), camera: wp3Cam.checked, yaw: _yaw(wp3Cam, wp3Yaw) }
-                ]
+                var targets = []
+                for (var i = 0; i < wpRepeater.count; i++) {
+                    var row = wpRepeater.itemAt(i)
+                    // Rows added with "+ Waypoint" but left empty are simply skipped.
+                    if (!row || row.latText.length === 0 || row.lonText.length === 0) {
+                        continue
+                    }
+                    targets.push({ coordinate: _coord(row.latText, row.lonText),
+                                   camera:     row.camOn,
+                                   yaw:        (row.camOn && row.yawText.length > 0) ? parseFloat(row.yawText) : -1 })
+                }
+                if (targets.length === 0) {
+                    return
+                }
+                var depth = _starMissionDepth(dialogDepthField.text)
                 _exitStarMissionMode()
-                planCreator.createFullPlan(_coord(homeLat, homeLon), targets)
+                planCreator.createFullPlan(_coord(homeLat.text, homeLon.text), targets, depth)
             }
 
-            GridLayout {
-                columns:        5
-                columnSpacing:  ScreenTools.defaultFontPixelWidth
-                rowSpacing:     ScreenTools.defaultFontPixelHeight / 2
+            ColumnLayout {
+                spacing: ScreenTools.defaultFontPixelHeight / 2
 
-                property real _latLonWidth: ScreenTools.defaultFontPixelWidth * 12
-                property real _yawWidth:    ScreenTools.defaultFontPixelWidth * 7
+                RowLayout {
+                    spacing: ScreenTools.defaultFontPixelWidth
 
-                QGCLabel { text: qsTr("Position"); font.bold: true }
-                QGCLabel { text: qsTr("Lat"); font.bold: true }
-                QGCLabel { text: qsTr("Lon"); font.bold: true }
-                QGCLabel { text: qsTr("Camera"); font.bold: true }
-                QGCLabel { text: qsTr("Yaw (°)"); font.bold: true }
+                    QGCLabel { text: qsTr("Position"); font.bold: true; Layout.preferredWidth: _labelWidth }
+                    QGCLabel { text: qsTr("Lat");      font.bold: true; Layout.preferredWidth: _latLonWidth }
+                    QGCLabel { text: qsTr("Lon");      font.bold: true; Layout.preferredWidth: _latLonWidth }
+                    QGCLabel { text: qsTr("Camera");   font.bold: true }
+                    QGCLabel { text: qsTr("Yaw (°)");  font.bold: true }
+                }
 
-                QGCLabel { text: qsTr("Home") }
-                QGCTextField { id: homeLat; Layout.preferredWidth: parent._latLonWidth; text: mapCenter ? mapCenter.latitude.toFixed(7) : "" }
-                QGCTextField { id: homeLon; Layout.preferredWidth: parent._latLonWidth; text: mapCenter ? mapCenter.longitude.toFixed(7) : "" }
-                Item { Layout.preferredWidth: 1 }
-                Item { Layout.preferredWidth: 1 }
+                RowLayout {
+                    spacing: ScreenTools.defaultFontPixelWidth
 
-                QGCLabel { text: qsTr("Waypoint 1") }
-                QGCTextField { id: wp1Lat; Layout.preferredWidth: parent._latLonWidth; placeholderText: qsTr("Lat") }
-                QGCTextField { id: wp1Lon; Layout.preferredWidth: parent._latLonWidth; placeholderText: qsTr("Lon") }
-                QGCCheckBox   { id: wp1Cam; text: qsTr("On"); checked: true }
-                QGCTextField { id: wp1Yaw; Layout.preferredWidth: parent._yawWidth; enabled: wp1Cam.checked; placeholderText: qsTr("auto") }
+                    QGCLabel     { text: qsTr("Home"); Layout.preferredWidth: _labelWidth }
+                    QGCTextField { id: homeLat; Layout.preferredWidth: _latLonWidth; text: mapCenter ? mapCenter.latitude.toFixed(7) : "" }
+                    QGCTextField { id: homeLon; Layout.preferredWidth: _latLonWidth; text: mapCenter ? mapCenter.longitude.toFixed(7) : "" }
+                }
 
-                QGCLabel { text: qsTr("Waypoint 2") }
-                QGCTextField { id: wp2Lat; Layout.preferredWidth: parent._latLonWidth; placeholderText: qsTr("Lat") }
-                QGCTextField { id: wp2Lon; Layout.preferredWidth: parent._latLonWidth; placeholderText: qsTr("Lon") }
-                QGCCheckBox   { id: wp2Cam; text: qsTr("On"); checked: true }
-                QGCTextField { id: wp2Yaw; Layout.preferredWidth: parent._yawWidth; enabled: wp2Cam.checked; placeholderText: qsTr("auto") }
+                Repeater {
+                    id:     wpRepeater
+                    model:  wpCount
 
-                QGCLabel { text: qsTr("Waypoint 3") }
-                QGCTextField { id: wp3Lat; Layout.preferredWidth: parent._latLonWidth; placeholderText: qsTr("Lat") }
-                QGCTextField { id: wp3Lon; Layout.preferredWidth: parent._latLonWidth; placeholderText: qsTr("Lon") }
-                QGCCheckBox   { id: wp3Cam; text: qsTr("On"); checked: true }
-                QGCTextField { id: wp3Yaw; Layout.preferredWidth: parent._yawWidth; enabled: wp3Cam.checked; placeholderText: qsTr("auto") }
+                    RowLayout {
+                        spacing: ScreenTools.defaultFontPixelWidth
+
+                        // Read back by onAccepted; the row keeps its own state so
+                        // adding a waypoint never disturbs the ones already typed.
+                        property alias latText: latField.text
+                        property alias lonText: lonField.text
+                        property alias camOn:   camCheck.checked
+                        property alias yawText: yawField.text
+
+                        QGCLabel     { text: qsTr("Waypoint %1").arg(index + 1); Layout.preferredWidth: _labelWidth }
+                        QGCTextField { id: latField;  Layout.preferredWidth: _latLonWidth; placeholderText: qsTr("Lat") }
+                        QGCTextField { id: lonField;  Layout.preferredWidth: _latLonWidth; placeholderText: qsTr("Lon") }
+                        QGCCheckBox  { id: camCheck;  text: qsTr("On"); checked: true }
+                        QGCTextField { id: yawField;  Layout.preferredWidth: _yawWidth; enabled: camCheck.checked; placeholderText: qsTr("auto") }
+                    }
+                }
+
+                RowLayout {
+                    spacing:            ScreenTools.defaultFontPixelWidth
+                    Layout.fillWidth:   true
+
+                    QGCButton {
+                        text:       qsTr("+ Waypoint")
+                        onClicked:  wpCount++
+                    }
+
+                    QGCButton {
+                        text:       qsTr("- Waypoint")
+                        enabled:    wpCount > 1
+                        onClicked:  wpCount--
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    QGCLabel { text: qsTr("Depth (m)") }
+
+                    QGCTextField {
+                        id:                     dialogDepthField
+                        Layout.preferredWidth:  _yawWidth + ScreenTools.defaultFontPixelWidth * 2
+                        text:                   depthText
+                        placeholderText:        qsTr("-1.0")
+                        // Empty = -1 m; a positive number is read as depth (_starMissionDepth).
+                    }
+                }
             }
         }
     }

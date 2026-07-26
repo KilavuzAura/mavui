@@ -33,9 +33,12 @@ public:
     Q_INVOKABLE void createPlan(const QGeoCoordinate& mapCenterCoord) final;
 
     /// Expands home + targets into the full mission and loads it into the plan.
-    ///     home     planned home / start position (mission ends here at the surface)
-    ///     targets  list of maps: { "coordinate": QGeoCoordinate,
-    ///                              "camera": bool,        // take a photo at this target
-    ///                              "yaw": double }        // camera heading in degrees, < 0 = no turn
-    Q_INVOKABLE void createFullPlan(const QGeoCoordinate& home, const QVariantList& targets);
+    ///     home         planned home / start position (mission ends here at the surface)
+    ///     targets      list of maps: { "coordinate": QGeoCoordinate,
+    ///                                  "camera": bool,        // take a photo at this target
+    ///                                  "yaw": double }        // camera heading in degrees, < 0 = no turn
+    ///     cruiseDepth  travel depth in meters, negative (0 / positive / NaN falls back to -1.0)
+    Q_INVOKABLE void createFullPlan(const QGeoCoordinate& home, const QVariantList& targets, double cruiseDepth = kDefaultCruiseDepth);
+
+    static constexpr double kDefaultCruiseDepth = -1.0; ///< used when the UI leaves the depth box empty
 };
