@@ -31,6 +31,12 @@ constexpr double kCruiseDepth   = -1.0; // fixed cruise depth (m, negative = bel
 // the camera on top clears the water. Matches aura_foto_plan_uret.py /
 // gorev_yukle.py (SATIH_DERINLIK).
 constexpr double kSurfaceDepth  = -0.1; // surface waypoint depth (m, negative)
+// Hold on the dive-in-place waypoints. ArduSub declares a waypoint reached when
+// the vehicle is within WPNAV_RADIUS in 3D, so a 1 m vertical leg completes while
+// the sub is still ~0.5 m down (log: "Reached command #13" at 0.48 m with the
+// target at 0.92 m) and the horizontal leg then runs shallow. The hold keeps the
+// mission on the dive waypoint until the sub is actually at cruise depth.
+constexpr int    kDiveSettle    = 5;    // seconds to settle after diving
 constexpr int    kSurfaceSettle = 1;    // seconds to settle after surfacing
 constexpr int    kPhotoBefore   = 3;    // seconds to wait before the photo
 constexpr int    kPhotoAfter    = 2;    // seconds to wait after the photo
@@ -121,7 +127,7 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate& home, const
         const bool   camera = target.value(QStringLiteral("camera")).toBool();
         const double yaw    = target.value(QStringLiteral("yaw"), -1.0).toDouble();
 
-        b.cruise(prevLat, prevLon);                 // 1) dive in place at the previous position
+        b.cruise(prevLat, prevLon, kDiveSettle);    // 1) dive in place and settle at cruise depth
         b.cruise(lat, lon);                         // 2) travel to the target at depth
         b.waypoint(lat, lon, kSurfaceDepth, kSurfaceSettle);  // 3) surface and settle
 
@@ -141,7 +147,7 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate& home, const
         prevLon = lon;
     }
 
-    b.cruise(prevLat, prevLon);                      // dive in place at the last target
+    b.cruise(prevLat, prevLon, kDiveSettle);         // dive in place and settle at the last target
     b.cruise(home.latitude(), home.longitude());     // return to home underwater
     b.waypoint(home.latitude(), home.longitude(), kSurfaceDepth); // surface, mission complete
 
