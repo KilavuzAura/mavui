@@ -315,6 +315,13 @@ Item {
         return depth > 0 ? -depth : depth
     }
 
+    // Surface/bottom clearance box: a distance, so the sign is dropped. Empty or
+    // nonsense returns NaN and the plan creator falls back to its own default.
+    function _starMissionClearance(text) {
+        var value = parseFloat(text)
+        return (isNaN(value) || value === 0) ? NaN : Math.abs(value)
+    }
+
     // Reads the placed home + target waypoints and expands them into the full
     // dive/surface/photo pattern via the plan creator.
     function _finishStarMissionMode() {
@@ -332,10 +339,13 @@ Item {
             var camera = it.cameraSection ? (it.cameraSection.cameraAction.rawValue === 6) : false
             targets.push({ coordinate: it.coordinate, camera: camera, yaw: -1 })
         }
-        var depth = _starMissionDepth(starMissionDepthField.text)
+        var depth       = _starMissionDepth(starMissionDepthField.text)
+        var autoDepth   = starMissionAutoDepthCheck.checked
+        var surface     = _starMissionClearance(starMissionSurfaceField.text)
+        var bottom      = _starMissionClearance(starMissionBottomField.text)
         _exitStarMissionMode()
         if (targets.length > 0) {
-            _starMissionCreator.createFullPlan(home, targets, depth)
+            _starMissionCreator.createFullPlan(home, targets, depth, autoDepth, surface, bottom)
         }
     }
 
@@ -791,22 +801,69 @@ Item {
                     }
                 }
 
+                // Depth row. Bottom following (terrain frame, rangefinder) sits to the
+                // left of the depth box and greys it out, since it replaces it.
                 RowLayout {
                     Layout.alignment:   Qt.AlignHCenter
                     spacing:            ScreenTools.defaultFontPixelWidth
 
-                    QGCLabel { text: qsTr("Depth (m)") }
+                    QGCCheckBox {
+                        id:     starMissionAutoDepthCheck
+                        text:   qsTr("Auto depth")
+                    }
+
+                    QGCLabel {
+                        text:       qsTr("Surface (m)")
+                        enabled:    starMissionAutoDepthCheck.checked
+                    }
+
+                    QGCTextField {
+                        id:                     starMissionSurfaceField
+                        Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 7
+                        placeholderText:        qsTr("0.3")
+                        enabled:                starMissionAutoDepthCheck.checked
+                        // Shallowest a cruise leg may be commanded to (m below surface).
+                    }
+
+                    QGCLabel {
+                        text:       qsTr("Bottom (m)")
+                        enabled:    starMissionAutoDepthCheck.checked
+                    }
+
+                    QGCTextField {
+                        id:                     starMissionBottomField
+                        Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 7
+                        placeholderText:        qsTr("1.0")
+                        enabled:                starMissionAutoDepthCheck.checked
+                        // Clearance held above the sea floor while cruising (m).
+                    }
+
+                    QGCLabel {
+                        text:       qsTr("Depth (m)")
+                        enabled:    !starMissionAutoDepthCheck.checked
+                    }
 
                     QGCTextField {
                         id:                     starMissionDepthField
                         Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 8
                         placeholderText:        qsTr("-1.0")
+                        enabled:                !starMissionAutoDepthCheck.checked
                         // Empty box = -1 m (see _starMissionDepth); negative = below surface.
                     }
+                }
+
+                RowLayout {
+                    Layout.alignment:   Qt.AlignHCenter
+                    spacing:            ScreenTools.defaultFontPixelWidth
 
                     QGCButton {
                         text:       qsTr("Table")
-                        onClicked:  starMissionOneDialog.createObject(mainWindow, { mapCenter: _mapCenter(), planCreator: _starMissionCreator, depthText: starMissionDepthField.text }).open()
+                        onClicked:  starMissionOneDialog.createObject(mainWindow, { mapCenter: _mapCenter(),
+                                                                                    planCreator: _starMissionCreator,
+                                                                                    depthText:   starMissionDepthField.text,
+                                                                                    autoDepth:   starMissionAutoDepthCheck.checked,
+                                                                                    surfaceText: starMissionSurfaceField.text,
+                                                                                    bottomText:  starMissionBottomField.text }).open()
 
                         function _mapCenter() {
                             var centerPoint = Qt.point(editorMap.centerViewport.left + (editorMap.centerViewport.width / 2), editorMap.centerViewport.top + (editorMap.centerViewport.height / 2))
@@ -1067,7 +1124,11 @@ Item {
 
             property var    planCreator
             property var    mapCenter
-            property string depthText:  ""      ///< seeded from the banner depth box
+            // Seeded from the banner so opening the table keeps what was typed there.
+            property string depthText:      ""
+            property bool   autoDepth:      false
+            property string surfaceText:    ""
+            property string bottomText:     ""
             property int    wpCount:    3       ///< grown by the "+ Waypoint" button
 
             property real _labelWidth:  ScreenTools.defaultFontPixelWidth * 12
@@ -1078,12 +1139,6 @@ Item {
                 return QtPositioning.coordinate(parseFloat(latText), parseFloat(lonText))
             }
 
-            // Clearance boxes hold a distance, so the sign is dropped: an empty or
-            // nonsense box returns NaN and the plan creator falls back to its default.
-            function _clearance(text) {
-                var value = parseFloat(text)
-                return (isNaN(value) || value === 0) ? NaN : Math.abs(value)
-            }
 
             onAccepted: {
                 var targets = []
@@ -1104,8 +1159,8 @@ Item {
                 _exitStarMissionMode()
                 planCreator.createFullPlan(_coord(homeLat.text, homeLon.text), targets, depth,
                                            autoDepthCheck.checked,
-                                           _clearance(surfaceClearanceField.text),
-                                           _clearance(bottomClearanceField.text))
+                                           _starMissionClearance(surfaceClearanceField.text),
+                                           _starMissionClearance(bottomClearanceField.text))
             }
 
             ColumnLayout {
@@ -1191,8 +1246,9 @@ Item {
                     Layout.fillWidth:   true
 
                     QGCCheckBox {
-                        id:     autoDepthCheck
-                        text:   qsTr("Auto depth (rangefinder + baro)")
+                        id:         autoDepthCheck
+                        text:       qsTr("Auto depth (rangefinder + baro)")
+                        checked:    autoDepth
                     }
 
                     Item { Layout.fillWidth: true }
@@ -1205,6 +1261,7 @@ Item {
                     QGCTextField {
                         id:                     surfaceClearanceField
                         Layout.preferredWidth:  _yawWidth
+                        text:                   surfaceText
                         placeholderText:        qsTr("0.3")
                         enabled:                autoDepthCheck.checked
                         // Shallowest a cruise leg may be commanded to (m below surface).
@@ -1218,6 +1275,7 @@ Item {
                     QGCTextField {
                         id:                     bottomClearanceField
                         Layout.preferredWidth:  _yawWidth
+                        text:                   bottomText
                         placeholderText:        qsTr("1.0")
                         enabled:                autoDepthCheck.checked
                         // Clearance held above the sea floor while cruising (m).
