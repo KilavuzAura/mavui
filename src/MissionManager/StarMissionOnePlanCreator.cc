@@ -51,31 +51,34 @@ constexpr int kCmdConditionDelay    = 112;
 constexpr int kCmdConditionYaw      = 115;
 constexpr int kCmdDoDigicamControl  = 203;
 constexpr int kFrameGlobalRelativeAlt = 3;
+constexpr int kFrameGlobalTerrainAlt  = 10;
 constexpr int kFrameMission           = 2;
+// QGroundControlQmlGlobal::AltMode values as written into the .plan file.
+constexpr int kAltModeRelative      = 1;
+constexpr int kAltModeTerrainFrame  = 4;
 
 class PatternBuilder
 {
 public:
-    explicit PatternBuilder(double cruiseDepth) : _cruiseDepth(cruiseDepth) {}
+    // autoDepth: cruise legs are emitted in the terrain frame (rangefinder holds
+    // bottomClearance above the floor) instead of the fixed barometric depth.
+    PatternBuilder(double cruiseDepth, bool autoDepth, double bottomClearance)
+        : _cruiseDepth(cruiseDepth), _autoDepth(autoDepth), _bottomClearance(bottomClearance) {}
 
-    // Cruise waypoint at depth (frame 3, negative altitude).
+    // Cruise waypoint: depth below the surface, or clearance above the floor
+    // when bottom following is on. Mirrors gorev_yukle.py seyir_wp().
     void cruise(double lat, double lon, int hold = 0) {
-        waypoint(lat, lon, _cruiseDepth, hold);
+        if (_autoDepth) {
+            _waypoint(lat, lon, _bottomClearance, hold, kFrameGlobalTerrainAlt, kAltModeTerrainFrame);
+        } else {
+            waypoint(lat, lon, _cruiseDepth, hold);
+        }
     }
 
-    // Surface/absolute-depth waypoint (frame 3).
+    // Surface/absolute-depth waypoint (frame 3). Surfacing is always barometric:
+    // the rangefinder says nothing about how close the hull is to the waterline.
     void waypoint(double lat, double lon, double alt, int hold = 0) {
-        QJsonObject o;
-        o[QStringLiteral("AMSLAltAboveTerrain")] = QJsonValue::Null;
-        o[QStringLiteral("Altitude")]            = alt;
-        o[QStringLiteral("AltitudeMode")]        = 1;
-        o[QStringLiteral("autoContinue")]        = true;
-        o[QStringLiteral("command")]             = kCmdNavWaypoint;
-        o[QStringLiteral("doJumpId")]            = _nextId();
-        o[QStringLiteral("frame")]               = kFrameGlobalRelativeAlt;
-        o[QStringLiteral("params")]              = QJsonArray({ hold, 0, 0, QJsonValue::Null, lat, lon, alt });
-        o[QStringLiteral("type")]                = QStringLiteral("SimpleItem");
-        _items.append(o);
+        _waypoint(lat, lon, alt, hold, kFrameGlobalRelativeAlt, kAltModeRelative);
     }
 
     // A DO/CONDITION command item (frame 2, no coordinate).
@@ -93,11 +96,27 @@ public:
     QJsonArray items() const { return _items; }
 
 private:
+    void _waypoint(double lat, double lon, double alt, int hold, int frame, int altMode) {
+        QJsonObject o;
+        o[QStringLiteral("AMSLAltAboveTerrain")] = QJsonValue::Null;
+        o[QStringLiteral("Altitude")]            = alt;
+        o[QStringLiteral("AltitudeMode")]        = altMode;
+        o[QStringLiteral("autoContinue")]        = true;
+        o[QStringLiteral("command")]             = kCmdNavWaypoint;
+        o[QStringLiteral("doJumpId")]            = _nextId();
+        o[QStringLiteral("frame")]               = frame;
+        o[QStringLiteral("params")]              = QJsonArray({ hold, 0, 0, QJsonValue::Null, lat, lon, alt });
+        o[QStringLiteral("type")]                = QStringLiteral("SimpleItem");
+        _items.append(o);
+    }
+
     int _nextId() { return _jumpId++; }
 
     QJsonArray _items;
     int        _jumpId = 1;
     double     _cruiseDepth;
+    bool       _autoDepth;
+    double     _bottomClearance;
 };
 } // namespace
 
@@ -112,7 +131,12 @@ void StarMissionOnePlanCreator::createPlan(const QGeoCoordinate& /*mapCenterCoor
     // Interactive: the real work happens once the placement mode has the coordinates.
 }
 
-void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate& home, const QVariantList& targets, double cruiseDepth)
+void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
+                                               const QVariantList&    targets,
+                                               double                 cruiseDepth,
+                                               bool                   autoDepth,
+                                               double                 surfaceClearance,
+                                               double                 bottomClearance)
 {
     if (!home.isValid() || targets.isEmpty()) {
         return;
@@ -124,7 +148,25 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate& home, const
         cruiseDepth = kDefaultCruiseDepth;
     }
 
-    PatternBuilder b(cruiseDepth);
+    // Both clearances are distances, so they are always positive. A blank or
+    // nonsense box falls back to the defaults instead of producing a plan that
+    // asks for a target at (or above) the waterline / inside the sea floor.
+    if (!std::isfinite(surfaceClearance) || surfaceClearance <= 0.0) {
+        surfaceClearance = kDefaultSurfaceClearance;
+    }
+    if (!std::isfinite(bottomClearance) || bottomClearance <= 0.0) {
+        bottomClearance = kDefaultBottomClearance;
+    }
+
+    // Never cruise shallower than the surface clearance: the cruise legs are the
+    // only part of the pattern that runs blind, and a too-shallow leg puts the
+    // hull (and the mission) at the waterline. Surfacing for a photo is a
+    // separate, deliberate -0.1 m waypoint and is not clamped.
+    if (cruiseDepth > -surfaceClearance) {
+        cruiseDepth = -surfaceClearance;
+    }
+
+    PatternBuilder b(cruiseDepth, autoDepth, bottomClearance);
     double prevLat = home.latitude();
     double prevLon = home.longitude();
 

@@ -1078,6 +1078,13 @@ Item {
                 return QtPositioning.coordinate(parseFloat(latText), parseFloat(lonText))
             }
 
+            // Clearance boxes hold a distance, so the sign is dropped: an empty or
+            // nonsense box returns NaN and the plan creator falls back to its default.
+            function _clearance(text) {
+                var value = parseFloat(text)
+                return (isNaN(value) || value === 0) ? NaN : Math.abs(value)
+            }
+
             onAccepted: {
                 var targets = []
                 for (var i = 0; i < wpRepeater.count; i++) {
@@ -1095,7 +1102,10 @@ Item {
                 }
                 var depth = _starMissionDepth(dialogDepthField.text)
                 _exitStarMissionMode()
-                planCreator.createFullPlan(_coord(homeLat.text, homeLon.text), targets, depth)
+                planCreator.createFullPlan(_coord(homeLat.text, homeLon.text), targets, depth,
+                                           autoDepthCheck.checked,
+                                           _clearance(surfaceClearanceField.text),
+                                           _clearance(bottomClearanceField.text))
             }
 
             ColumnLayout {
@@ -1165,7 +1175,52 @@ Item {
                         Layout.preferredWidth:  _yawWidth + ScreenTools.defaultFontPixelWidth * 2
                         text:                   depthText
                         placeholderText:        qsTr("-1.0")
+                        enabled:                !autoDepthCheck.checked
                         // Empty = -1 m; a positive number is read as depth (_starMissionDepth).
+                        // Bottom following overrides it, so the box is greyed out then.
+                    }
+                }
+
+                // Automatic depth control: cruise legs ride the bottom in the terrain
+                // frame (rangefinder) instead of holding a fixed barometric depth.
+                // Needs RNGFND1_TYPE/ORIENT/MAX_CM + WP_RFND_USE=1 and a live
+                // DISTANCE_SENSOR stream on the vehicle, otherwise AUTO throws a
+                // terrain failsafe. Surfacing for photos stays barometric.
+                RowLayout {
+                    spacing:            ScreenTools.defaultFontPixelWidth
+                    Layout.fillWidth:   true
+
+                    QGCCheckBox {
+                        id:     autoDepthCheck
+                        text:   qsTr("Auto depth (rangefinder + baro)")
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    QGCLabel {
+                        text:       qsTr("From surface (m)")
+                        enabled:    autoDepthCheck.checked
+                    }
+
+                    QGCTextField {
+                        id:                     surfaceClearanceField
+                        Layout.preferredWidth:  _yawWidth
+                        placeholderText:        qsTr("0.3")
+                        enabled:                autoDepthCheck.checked
+                        // Shallowest a cruise leg may be commanded to (m below surface).
+                    }
+
+                    QGCLabel {
+                        text:       qsTr("From bottom (m)")
+                        enabled:    autoDepthCheck.checked
+                    }
+
+                    QGCTextField {
+                        id:                     bottomClearanceField
+                        Layout.preferredWidth:  _yawWidth
+                        placeholderText:        qsTr("1.0")
+                        enabled:                autoDepthCheck.checked
+                        // Clearance held above the sea floor while cruising (m).
                     }
                 }
             }
