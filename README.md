@@ -65,7 +65,9 @@ Araç ağında (`192.168.2.0/24`) BlueOS `192.168.2.2`'dedir. Masaüstünde `192
 | Yer | İçerik |
 |---|---|
 | `custom/` | MavUI overlay'i: markalama, varsayılanlar, Android kimliği/ikonları |
-| `main` branch | Bu proje (QGC Stable_V5.0 + MavUI commit'leri) |
+| `main` branch | Varsayılan: sade MavUI + STARS 2026 yarışma eklentileri (**AUV Stars 2026 Mission One** plan üreticisi) |
+| `simple` branch | Sade MavUI (yarışma eklentisi yok) — AUV geliştirme ortamı bunu kullanır |
+| `torpedo` branch | AuraTorpedo UUV sürümü |
 | `custom` branch | Takımın önceki el yazması Qt Widgets GCS'i (arşiv) |
 
 ## Lisans ve üst kaynak
