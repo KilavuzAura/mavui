@@ -751,59 +751,79 @@ Item {
             anchors.horizontalCenter:   parent.horizontalCenter
             z:                          QGroundControl.zOrderWidgets
             visible:                    _starMissionMode
-            width:                      starMissionBannerRow.width + (ScreenTools.defaultFontPixelWidth * 3)
-            height:                     starMissionBannerRow.height + (ScreenTools.defaultFontPixelHeight)
+            width:                      starMissionBannerCol.width + (ScreenTools.defaultFontPixelWidth * 3)
+            height:                     starMissionBannerCol.height + (ScreenTools.defaultFontPixelHeight)
             radius:                     ScreenTools.defaultFontPixelHeight / 2
             color:                      qgcPal.window
             border.color:               qgcPal.buttonHighlight
             border.width:               1
 
-            RowLayout {
-                id:                 starMissionBannerRow
+            // Title/hint on the first line, controls on the second: as one row the
+            // banner grew wider than the map and spilled out over its sides. The
+            // labels also wrap so a narrow window never pushes them off the edge.
+            ColumnLayout {
+                id:                 starMissionBannerCol
                 anchors.centerIn:   parent
-                spacing:            ScreenTools.defaultFontPixelWidth
+                spacing:            ScreenTools.defaultFontPixelHeight / 4
 
-                QGCLabel {
-                    text:       qsTr("AUV Stars 2026 Mission One")
-                    font.bold:  true
-                }
+                property real _maxTextWidth: editorMap.width - (ScreenTools.defaultFontPixelWidth * 8)
 
-                QGCLabel {
-                    text:               _starMissionHomeSet
-                                            ? qsTr("Click map to add targets")
-                                            : qsTr("Click map to set Home position")
-                    color:              qgcPal.colorGrey
-                    font.pointSize:     ScreenTools.smallFontPointSize
-                }
+                RowLayout {
+                    Layout.alignment:   Qt.AlignHCenter
+                    Layout.maximumWidth: starMissionBannerCol._maxTextWidth
+                    spacing:            ScreenTools.defaultFontPixelWidth
 
-                QGCLabel { text: qsTr("Depth (m)") }
+                    QGCLabel {
+                        text:       qsTr("AUV Stars 2026 Mission One")
+                        font.bold:  true
+                        wrapMode:   Text.WordWrap
+                        Layout.maximumWidth: starMissionBannerCol._maxTextWidth / 2
+                    }
 
-                QGCTextField {
-                    id:                     starMissionDepthField
-                    Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 8
-                    placeholderText:        qsTr("-1.0")
-                    // Empty box = -1 m (see _starMissionDepth); negative = below surface.
-                }
-
-                QGCButton {
-                    text:       qsTr("Table")
-                    onClicked:  starMissionOneDialog.createObject(mainWindow, { mapCenter: _mapCenter(), planCreator: _starMissionCreator, depthText: starMissionDepthField.text }).open()
-
-                    function _mapCenter() {
-                        var centerPoint = Qt.point(editorMap.centerViewport.left + (editorMap.centerViewport.width / 2), editorMap.centerViewport.top + (editorMap.centerViewport.height / 2))
-                        return editorMap.toCoordinate(centerPoint, false /* clipToViewPort */)
+                    QGCLabel {
+                        text:               _starMissionHomeSet
+                                                ? qsTr("Click map to add targets")
+                                                : qsTr("Click map to set Home position")
+                        color:              qgcPal.colorGrey
+                        font.pointSize:     ScreenTools.smallFontPointSize
+                        wrapMode:           Text.WordWrap
+                        Layout.maximumWidth: starMissionBannerCol._maxTextWidth / 2
                     }
                 }
 
-                QGCButton {
-                    text:       qsTr("Finish")
-                    primary:    true
-                    onClicked:  _finishStarMissionMode()
-                }
+                RowLayout {
+                    Layout.alignment:   Qt.AlignHCenter
+                    spacing:            ScreenTools.defaultFontPixelWidth
 
-                QGCButton {
-                    text:       qsTr("Cancel")
-                    onClicked:  _cancelStarMissionMode()
+                    QGCLabel { text: qsTr("Depth (m)") }
+
+                    QGCTextField {
+                        id:                     starMissionDepthField
+                        Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 8
+                        placeholderText:        qsTr("-1.0")
+                        // Empty box = -1 m (see _starMissionDepth); negative = below surface.
+                    }
+
+                    QGCButton {
+                        text:       qsTr("Table")
+                        onClicked:  starMissionOneDialog.createObject(mainWindow, { mapCenter: _mapCenter(), planCreator: _starMissionCreator, depthText: starMissionDepthField.text }).open()
+
+                        function _mapCenter() {
+                            var centerPoint = Qt.point(editorMap.centerViewport.left + (editorMap.centerViewport.width / 2), editorMap.centerViewport.top + (editorMap.centerViewport.height / 2))
+                            return editorMap.toCoordinate(centerPoint, false /* clipToViewPort */)
+                        }
+                    }
+
+                    QGCButton {
+                        text:       qsTr("Finish")
+                        primary:    true
+                        onClicked:  _finishStarMissionMode()
+                    }
+
+                    QGCButton {
+                        text:       qsTr("Cancel")
+                        onClicked:  _cancelStarMissionMode()
+                    }
                 }
             }
         }
