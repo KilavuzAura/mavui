@@ -20,7 +20,7 @@
 
 #include <cmath>
 
-const QString StarMissionOnePlanCreator::name = QStringLiteral("Star Mission One");
+const QString StarMissionOnePlanCreator::name = QStringLiteral("AUV Stars 2026 Mission One");
 
 namespace {
 // Movement pattern constants — kept in sync with tools/aura_foto_plan_uret.py.

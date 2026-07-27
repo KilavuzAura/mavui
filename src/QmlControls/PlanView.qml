@@ -764,7 +764,7 @@ Item {
                 spacing:            ScreenTools.defaultFontPixelWidth
 
                 QGCLabel {
-                    text:       qsTr("Star Mission One")
+                    text:       qsTr("AUV Stars 2026 Mission One")
                     font.bold:  true
                 }
 
@@ -1042,7 +1042,7 @@ Item {
         id: starMissionOneDialog
 
         QGCPopupDialog {
-            title:      qsTr("Star Mission One")
+            title:      qsTr("AUV Stars 2026 Mission One")
             buttons:    Dialog.Ok | Dialog.Cancel
 
             property var    planCreator
