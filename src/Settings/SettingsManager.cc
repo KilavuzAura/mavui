@@ -28,6 +28,7 @@
 #include "PlanViewSettings.h"
 #include "RemoteIDSettings.h"
 #include "RTKSettings.h"
+#include "StarMissionSettings.h"
 #include "UnitsSettings.h"
 #include "VideoSettings.h"
 #include "MavlinkSettings.h"
@@ -86,6 +87,7 @@ void SettingsManager::init()
     _planViewSettings = new PlanViewSettings(this);
     _remoteIDSettings = new RemoteIDSettings(this);
     _rtkSettings = new RTKSettings(this);
+    _starMissionSettings = new StarMissionSettings(this);
     _videoSettings = new VideoSettings(this);
     _mavlinkSettings = new MavlinkSettings(this);
 #ifdef QGC_VIEWER3D
@@ -112,6 +114,7 @@ OfflineMapsSettings *SettingsManager::offlineMapsSettings() const { return _offl
 PlanViewSettings *SettingsManager::planViewSettings() const { return _planViewSettings; }
 RemoteIDSettings *SettingsManager::remoteIDSettings() const { return _remoteIDSettings; }
 RTKSettings *SettingsManager::rtkSettings() const { return _rtkSettings; }
+StarMissionSettings *SettingsManager::starMissionSettings() const { return _starMissionSettings; }
 UnitsSettings *SettingsManager::unitsSettings() const { return _unitsSettings; }
 VideoSettings *SettingsManager::videoSettings() const { return _videoSettings; }
 MavlinkSettings *SettingsManager::mavlinkSettings() const { return _mavlinkSettings; }

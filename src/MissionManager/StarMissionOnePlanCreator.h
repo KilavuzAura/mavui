@@ -14,6 +14,8 @@
 #include <QtCore/QVariantList>
 #include <QtPositioning/QGeoCoordinate>
 
+#include <limits>
+
 /// Plan creator for the AURA "AUV Stars 2026 Mission One" competition task. The user
 /// places a home position plus target waypoints (the square-area centers),
 /// then the plan is expanded into the full underwater dive/surface/photo
@@ -36,20 +38,34 @@ public:
     ///     home                planned home / start position (mission ends here at the surface)
     ///     targets             list of maps: { "coordinate": QGeoCoordinate,
     ///                                         "camera": bool,        // take a photo at this target
-    ///                                         "yaw": double }        // camera heading in degrees, < 0 = no turn
+    ///                                         "yaw": double,         // camera heading in degrees, < 0 = no turn
+    ///                                         "anchor": bool }       // drop anchor (MAV_CMD_AURA_ANCHOR) here
     ///     cruiseDepth         travel depth in meters, negative (0 / positive / NaN falls back to -1.0)
     ///     autoDepth           true: cruise legs ride the bottom (terrain frame, rangefinder) instead of
     ///                         a fixed barometric depth. Needs RNGFND1_* + WP_RFND_USE=1 on the vehicle.
     ///     surfaceClearance    minimum distance to keep below the surface while cruising (m, positive)
     ///     bottomClearance     distance to hold above the sea floor while cruising (m, positive)
+    ///     photoBefore         CONDITION_DELAY before the shutter (s) — the "3" item in a generated plan.
+    ///                         NaN falls back to StarMissionSettings::photoBefore.
+    ///     photoWindow         hold on the photo-window waypoint (s) — the "5" item; a camera turn adds
+    ///                         kTurnSeconds on top so the DO/CONDITION queue always fits inside it.
+    ///                         NaN falls back to StarMissionSettings::photoWindow.
+    ///
+    /// The anchor tuning and the dive/surface holds are not arguments: they come from
+    /// StarMissionSettings (App Settings -> Mission One) on every call.
     Q_INVOKABLE void createFullPlan(const QGeoCoordinate&  home,
                                     const QVariantList&    targets,
                                     double                 cruiseDepth      = kDefaultCruiseDepth,
                                     bool                   autoDepth        = false,
                                     double                 surfaceClearance = kDefaultSurfaceClearance,
-                                    double                 bottomClearance  = kDefaultBottomClearance);
+                                    double                 bottomClearance  = kDefaultBottomClearance,
+                                    double                 photoBefore      = kUseSetting,
+                                    double                 photoWindow      = kUseSetting);
 
     static constexpr double kDefaultCruiseDepth      = -1.0; ///< used when the UI leaves the depth box empty
     static constexpr double kDefaultSurfaceClearance =  0.3; ///< shallowest a cruise leg may be commanded (m below surface)
     static constexpr double kDefaultBottomClearance  =  1.0; ///< terrain-frame cruise altitude above the floor (m)
+    /// Sentinel for "take this from StarMissionSettings" — the non-finite check in
+    /// createFullPlan() already routes blank UI boxes down the same path.
+    static constexpr double kUseSetting = std::numeric_limits<double>::quiet_NaN();
 };

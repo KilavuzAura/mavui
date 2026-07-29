@@ -30,6 +30,7 @@ class OfflineMapsSettings;
 class PlanViewSettings;
 class RemoteIDSettings;
 class RTKSettings;
+class StarMissionSettings;
 class UnitsSettings;
 class VideoSettings;
 class Viewer3DSettings;
@@ -62,6 +63,7 @@ class SettingsManager : public QObject
     Q_MOC_INCLUDE("PlanViewSettings.h")
     Q_MOC_INCLUDE("RemoteIDSettings.h")
     Q_MOC_INCLUDE("RTKSettings.h")
+    Q_MOC_INCLUDE("StarMissionSettings.h")
     Q_MOC_INCLUDE("UnitsSettings.h")
     Q_MOC_INCLUDE("VideoSettings.h")
     Q_MOC_INCLUDE("MavlinkSettings.h")
@@ -87,6 +89,7 @@ class SettingsManager : public QObject
     Q_PROPERTY(QObject *planViewSettings                READ planViewSettings               CONSTANT)
     Q_PROPERTY(QObject *remoteIDSettings                READ remoteIDSettings               CONSTANT)
     Q_PROPERTY(QObject *rtkSettings                     READ rtkSettings                    CONSTANT)
+    Q_PROPERTY(QObject *starMissionSettings             READ starMissionSettings            CONSTANT)
     Q_PROPERTY(QObject *unitsSettings                   READ unitsSettings                  CONSTANT)
     Q_PROPERTY(QObject *videoSettings                   READ videoSettings                  CONSTANT)
     Q_PROPERTY(QObject *mavlinkSettings                 READ mavlinkSettings                CONSTANT)
@@ -121,6 +124,7 @@ public:
     PlanViewSettings *planViewSettings() const;
     RemoteIDSettings *remoteIDSettings() const;
     RTKSettings *rtkSettings() const;
+    StarMissionSettings *starMissionSettings() const;
     UnitsSettings *unitsSettings() const;
     VideoSettings *videoSettings() const;
     MavlinkSettings *mavlinkSettings() const;
@@ -148,6 +152,7 @@ private:
     PlanViewSettings *_planViewSettings = nullptr;
     RemoteIDSettings *_remoteIDSettings = nullptr;
     RTKSettings *_rtkSettings = nullptr;
+    StarMissionSettings *_starMissionSettings = nullptr;
     UnitsSettings *_unitsSettings = nullptr;
     VideoSettings *_videoSettings = nullptr;
     MavlinkSettings *_mavlinkSettings = nullptr;

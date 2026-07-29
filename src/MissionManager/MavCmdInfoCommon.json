@@ -1243,6 +1243,41 @@
             }
         },
         { "id": 30001, "rawName": "MAV_CMD_PAYLOAD_PREPARE_DEPLOY", "friendlyName": "Payload prepare deploy" },
-        { "id": 30002, "rawName": "MAV_CMD_PAYLOAD_CONTROL_DEPLOY", "friendlyName": "Payload control deploy" }
+        { "id": 30002, "rawName": "MAV_CMD_PAYLOAD_CONTROL_DEPLOY", "friendlyName": "Payload control deploy" },
+        {
+            "id":           31010,
+            "rawName":      "MAV_CMD_USER_1",
+            "friendlyName": "Drop anchor",
+            "description":  "Anchors the vehicle at its current point. It will not advance to the next waypoint until it has stayed inside the settle radius continuously.",
+            "category":     "AURA",
+            "param1": {
+                "label":            "Duration",
+                "units":            "secs",
+                "default":          20,
+                "decimalPlaces":    0,
+                "min":              0
+            },
+            "param2": {
+                "label":            "Settle radius",
+                "units":            "m",
+                "default":          0.3,
+                "decimalPlaces":    2,
+                "min":              0
+            },
+            "param3": {
+                "label":            "Settle time",
+                "units":            "secs",
+                "default":          3,
+                "decimalPlaces":    0,
+                "min":              0
+            },
+            "param4": {
+                "label":            "Guard timeout",
+                "units":            "secs",
+                "default":          0,
+                "decimalPlaces":    0,
+                "min":              0
+            }
+        }
     ]
 }

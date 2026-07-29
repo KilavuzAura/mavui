@@ -9,6 +9,8 @@
 
 #include "StarMissionOnePlanCreator.h"
 #include "PlanMasterController.h"
+#include "SettingsManager.h"
+#include "StarMissionSettings.h"
 
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
@@ -18,6 +20,7 @@
 #include <QtCore/QTemporaryFile>
 #include <QtCore/QDir>
 
+#include <algorithm>
 #include <cmath>
 
 const QString StarMissionOnePlanCreator::name = QStringLiteral("AUV Stars 2026 Mission One");
@@ -34,22 +37,44 @@ namespace {
 // the camera on top clears the water. Matches aura_foto_plan_uret.py /
 // gorev_yukle.py (SATIH_DERINLIK).
 constexpr double kSurfaceDepth  = -0.1; // surface waypoint depth (m, negative)
-// Hold on the dive-in-place waypoints. ArduSub declares a waypoint reached when
-// the vehicle is within WPNAV_RADIUS in 3D, so a 1 m vertical leg completes while
-// the sub is still ~0.5 m down (log: "Reached command #13" at 0.48 m with the
-// target at 0.92 m) and the horizontal leg then runs shallow. The hold keeps the
-// mission on the dive waypoint until the sub is actually at cruise depth.
-constexpr int    kDiveSettle    = 5;    // seconds to settle after diving
-constexpr int    kSurfaceSettle = 1;    // seconds to settle after surfacing
-constexpr int    kPhotoBefore   = 3;    // seconds to wait before the photo
-constexpr int    kPhotoAfter    = 2;    // seconds to wait after the photo
 constexpr int    kTurnSeconds   = 2;    // fixed budget for the camera turn
 constexpr int    kYawRate       = 90;   // camera yaw rate (deg/s)
+
+// The dive/surface holds and the "drop anchor" (MAV_CMD_AURA_ANCHOR) tuning are
+// operator-editable in App Settings -> Mission One (StarMissionSettings), so they
+// are read per plan instead of being compile-time constants. Both matter because
+// AC_WPNav latches reached_destination (AC_WPNav.cpp:540): once the sub touches
+// WPNAV_RADIUS the hold timer runs even if drift then carries it away, and a
+// vertical leg completes while the sub is still shallow.
+struct MissionTuning {
+    int    diveSettle;      // seconds to settle after diving
+    int    surfaceSettle;   // seconds to settle after surfacing
+    double anchorRadius;    // settle radius (m); 0 disables the settle gate
+    int    anchorSettle;    // seconds to stay inside the radius, uninterrupted
+    int    anchorGuard;     // safety ceiling (s); 0 = firmware default (duration*3 + 30)
+    double photoBefore;     // CONDITION_DELAY before the shutter (s)
+    double photoWindow;     // hold on the photo-window waypoint / anchor duration (s)
+};
+
+MissionTuning loadTuning()
+{
+    StarMissionSettings* s = SettingsManager::instance()->starMissionSettings();
+    return {
+        s->diveSettle()->rawValue().toInt(),
+        s->surfaceSettle()->rawValue().toInt(),
+        s->anchorRadius()->rawValue().toDouble(),
+        s->anchorSettle()->rawValue().toInt(),
+        s->anchorGuard()->rawValue().toInt(),
+        s->photoBefore()->rawValue().toDouble(),
+        s->photoWindow()->rawValue().toDouble(),
+    };
+}
 
 constexpr int kCmdNavWaypoint       = 16;
 constexpr int kCmdConditionDelay    = 112;
 constexpr int kCmdConditionYaw      = 115;
 constexpr int kCmdDoDigicamControl  = 203;
+constexpr int kCmdAuraAnchor        = 31010; // MAV_CMD_USER_1 in the aurapilot ArduSub fork
 constexpr int kFrameGlobalRelativeAlt = 3;
 constexpr int kFrameGlobalTerrainAlt  = 10;
 constexpr int kFrameMission           = 2;
@@ -136,7 +161,9 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
                                                double                 cruiseDepth,
                                                bool                   autoDepth,
                                                double                 surfaceClearance,
-                                               double                 bottomClearance)
+                                               double                 bottomClearance,
+                                               double                 photoBefore,
+                                               double                 photoWindow)
 {
     if (!home.isValid() || targets.isEmpty()) {
         return;
@@ -157,6 +184,20 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
     if (!std::isfinite(bottomClearance) || bottomClearance <= 0.0) {
         bottomClearance = kDefaultBottomClearance;
     }
+
+    const MissionTuning tuning = loadTuning();
+
+    // Photo timing boxes. A blank/nonsense box falls back to whatever the operator
+    // set in App Settings -> Mission One, so the panel is the single source of truth
+    // for the defaults; the per-plan boxes only override them.
+    if (!std::isfinite(photoBefore) || photoBefore < 0.0) {
+        photoBefore = tuning.photoBefore;
+    }
+    if (!std::isfinite(photoWindow) || photoWindow <= 0.0) {
+        photoWindow = tuning.photoWindow;
+    }
+    const int photoBeforeS = static_cast<int>(std::lround(photoBefore));
+    const int photoWindowS = static_cast<int>(std::lround(photoWindow));
 
     // Never cruise shallower than the surface clearance: the cruise legs are the
     // only part of the pattern that runs blind, and a too-shallow leg puts the
@@ -180,28 +221,48 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
         const double lon = coord.longitude();
         const bool   camera = target.value(QStringLiteral("camera")).toBool();
         const double yaw    = target.value(QStringLiteral("yaw"), -1.0).toDouble();
+        const bool   anchor = target.value(QStringLiteral("anchor")).toBool();
 
-        b.cruise(prevLat, prevLon, kDiveSettle);    // 1) dive in place and settle at cruise depth
-        b.cruise(lat, lon);                         // 2) travel to the target at depth
-        b.waypoint(lat, lon, kSurfaceDepth, kSurfaceSettle);  // 3) surface and settle
+        b.cruise(prevLat, prevLon, tuning.diveSettle);  // 1) dive in place and settle at cruise depth
+        b.cruise(lat, lon);                             // 2) travel to the target at depth
+        b.waypoint(lat, lon, kSurfaceDepth, tuning.surfaceSettle);  // 3) surface and settle
 
         if (camera) {
-            int window = kPhotoBefore + kPhotoAfter;
+            int window = photoWindowS;
+            int queue  = photoBeforeS;
             if (yaw >= 0.0) {
                 const int deg = (static_cast<int>(yaw) % 360 + 360) % 360;
                 b.command(kCmdConditionYaw, QJsonArray({ deg, kYawRate, 0, 0, 0, 0, 0 })); // 4) turn to camera heading
                 window += kTurnSeconds;
+                queue  += kTurnSeconds;
             }
-            b.command(kCmdConditionDelay, QJsonArray({ kPhotoBefore, 0, 0, 0, 0, 0, 0 })); // 5) wait
+            // The window must outlast the DO/CONDITION queue: AP_Mission drops the
+            // pending queue when the next nav command completes, so a short window
+            // means the shutter never fires (advance_current_nav_cmd).
+            window = std::max(window, queue + 1);
+
+            b.command(kCmdConditionDelay, QJsonArray({ photoBeforeS, 0, 0, 0, 0, 0, 0 })); // 5) wait
             b.command(kCmdDoDigicamControl, QJsonArray({ 0, 0, 0, 0, 1, 0, 0 }));          // 6) take photo
-            b.waypoint(lat, lon, kSurfaceDepth, window);                                          // 7) hold the photo window
+            if (anchor) {
+                // 7) Anchor instead of a plain hold: the queue still runs during it,
+                //    but the mission waits until the sub has actually settled, so the
+                //    photo is taken on-station.
+                b.command(kCmdAuraAnchor, QJsonArray({ window, tuning.anchorRadius,
+                                                       tuning.anchorSettle, tuning.anchorGuard, 0, 0, 0 }));
+            } else {
+                b.waypoint(lat, lon, kSurfaceDepth, window);                               // 7) hold the photo window
+            }
+        } else if (anchor) {
+            // No photo here, but the operator still wants the sub pinned to the spot.
+            b.command(kCmdAuraAnchor, QJsonArray({ photoWindowS, tuning.anchorRadius,
+                                                   tuning.anchorSettle, tuning.anchorGuard, 0, 0, 0 }));
         }
 
         prevLat = lat;
         prevLon = lon;
     }
 
-    b.cruise(prevLat, prevLon, kDiveSettle);         // dive in place and settle at the last target
+    b.cruise(prevLat, prevLon, tuning.diveSettle);   // dive in place and settle at the last target
     b.cruise(home.latitude(), home.longitude());     // return to home underwater
     b.waypoint(home.latitude(), home.longitude(), kSurfaceDepth); // surface, mission complete
 

@@ -1,0 +1,80 @@
+{
+    "version":  1,
+    "fileType": "FactMetaData",
+    "QGC.MetaData.Facts":
+[
+{
+    "name":         "anchorRadius",
+    "shortDesc":    "Anchor settle radius",
+    "longDesc":     "The vehicle must stay within this distance of the locked point before the anchor is considered settled. 0 disables the settle gate. Keep it above the position-hold accuracy of the vehicle: a radius below the noise floor never latches and the anchor stretches to its guard timeout.",
+    "type":         "double",
+    "default":      1.0,
+    "units":        "m",
+    "min":          0.0,
+    "max":          100.0,
+    "decimalPlaces": 2
+},
+{
+    "name":         "anchorSettle",
+    "shortDesc":    "Anchor settle time",
+    "longDesc":     "Uninterrupted time the vehicle must stay inside the settle radius before the anchor duration starts counting. Leaving the radius resets this timer.",
+    "type":         "uint16",
+    "default":      3,
+    "units":        "s",
+    "min":          0,
+    "max":          600
+},
+{
+    "name":         "anchorGuard",
+    "shortDesc":    "Anchor guard timeout",
+    "longDesc":     "Overall ceiling on a single anchor command, counted from when it starts. Guarantees the mission advances even if the vehicle can never settle. 0 uses the firmware default of duration*3 + 30 s.",
+    "type":         "uint16",
+    "default":      0,
+    "units":        "s",
+    "min":          0,
+    "max":          3600
+},
+{
+    "name":         "photoBefore",
+    "shortDesc":    "Delay before shutter",
+    "longDesc":     "CONDITION_DELAY inserted after the camera turn and before the shutter fires, so the vehicle has settled on heading when the photo is taken.",
+    "type":         "double",
+    "default":      3.0,
+    "units":        "s",
+    "min":          0.0,
+    "max":          600.0,
+    "decimalPlaces": 1
+},
+{
+    "name":         "photoWindow",
+    "shortDesc":    "Photo window / anchor duration",
+    "longDesc":     "Hold time of the photo-window waypoint, and the anchor duration when Anchor is on. A camera turn adds 2 s on top. It must be longer than the DO/CONDITION queue, otherwise AP_Mission drops the queue and no photo is taken.",
+    "type":         "double",
+    "default":      5.0,
+    "units":        "s",
+    "min":          1.0,
+    "max":          600.0,
+    "decimalPlaces": 1
+},
+{
+    "name":         "diveSettle",
+    "shortDesc":    "Dive settle hold",
+    "longDesc":     "Hold on the dive-in-place waypoint. ArduSub declares a waypoint reached within WPNAV_RADIUS in 3D, so a short vertical leg completes while the vehicle is still shallow. This hold keeps the mission on the dive waypoint until it is actually at cruise depth.",
+    "type":         "uint16",
+    "default":      5,
+    "units":        "s",
+    "min":          0,
+    "max":          600
+},
+{
+    "name":         "surfaceSettle",
+    "shortDesc":    "Surface settle hold",
+    "longDesc":     "Hold on the surface waypoint after ascending, before the camera turn and shutter sequence starts.",
+    "type":         "uint16",
+    "default":      1,
+    "units":        "s",
+    "min":          0,
+    "max":          600
+}
+]
+}

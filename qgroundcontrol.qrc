@@ -76,6 +76,7 @@
         <file alias="MissionSettings.FactMetaData.json">src/MissionManager/MissionSettings.FactMetaData.json</file>
         <file alias="OfflineMaps.SettingsGroup.json">src/Settings/OfflineMaps.SettingsGroup.json</file>
         <file alias="PlanView.SettingsGroup.json">src/Settings/PlanView.SettingsGroup.json</file>
+        <file alias="StarMission.SettingsGroup.json">src/Settings/StarMission.SettingsGroup.json</file>
         <file alias="QGCMapCircle.Facts.json">src/QmlControls/QGCMapCircle.Facts.json</file>
         <file alias="RallyPoint.FactMetaData.json">src/MissionManager/RallyPoint.FactMetaData.json</file>
         <file alias="RCToParamDialog.FactMetaData.json">src/QmlControls/RCToParamDialog.FactMetaData.json</file>

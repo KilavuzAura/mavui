@@ -553,6 +553,14 @@ QList<MAV_CMD> APMFirmwarePlugin::supportedMissionCommands(QGCMAVLink::VehicleCl
         MAV_CMD_NAV_LAND, MAV_CMD_NAV_TAKEOFF,
     };
 
+    // AURA: ArduSub fork'una eklenen ozel gorev komutlari
+    QList<MAV_CMD> auraSubCommands = {
+        MAV_CMD_USER_1,     // 31010 - drop anchor
+    };
+
+    if (vehicleClass == QGCMAVLink::VehicleClassSub) {
+        supportedCommands += auraSubCommands;
+    }
     if (vehicleClass == QGCMAVLink::VehicleClassGeneric) {
         supportedCommands   += vtolCommands;
         supportedCommands   += flightCommands;

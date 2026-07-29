@@ -22,6 +22,7 @@ qt_add_qml_module(AppSettingsModule
         SerialSettings.qml
         SettingsPage.qml
         SettingsPagesModel.qml
+        StarMissionSettings.qml
         TcpSettings.qml
         TelemetrySettings.qml
         UdpSettings.qml

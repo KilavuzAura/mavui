@@ -35,6 +35,13 @@ ListModel {
     }
 
     ListElement {
+        name: qsTr("Mission One")
+        url: "qrc:/qml/QGroundControl/AppSettings/StarMissionSettings.qml"
+        iconUrl: "qrc:/qmlimages/Plan.svg"
+        pageVisible: function() { return true }
+    }
+
+    ListElement {
         name: qsTr("Video")
         url: "qrc:/qml/QGroundControl/AppSettings/VideoSettings.qml"
         iconUrl: "qrc:/InstrumentValueIcons/camera.svg"

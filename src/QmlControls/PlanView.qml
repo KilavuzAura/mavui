@@ -56,6 +56,7 @@ Item {
     property int    _toolStripBottom:                   toolStrip.height + toolStrip.y
     property var    _appSettings:                       QGroundControl.settingsManager.appSettings
     property var    _planViewSettings:                  QGroundControl.settingsManager.planViewSettings
+    property var    _starMissionSettings:               QGroundControl.settingsManager.starMissionSettings
     property bool   _promptForPlanUsageShowing:         false
     property bool   _utmspEnabled:                      QGroundControl.utmspSupported
     property bool   _resetGeofencePolygon:              false   //Reset the Geofence Polygon
@@ -322,6 +323,13 @@ Item {
         return (isNaN(value) || value === 0) ? NaN : Math.abs(value)
     }
 
+    // Photo timing box (seconds). Empty or nonsense returns NaN so the plan creator
+    // keeps its own default (3 s before the shutter, 5 s window).
+    function _starMissionWait(text) {
+        var value = parseFloat(text)
+        return (isNaN(value) || value < 0) ? NaN : value
+    }
+
     // Reads the placed home + target waypoints and expands them into the full
     // dive/surface/photo pattern via the plan creator.
     function _finishStarMissionMode() {
@@ -337,15 +345,21 @@ Item {
                 continue
             }
             var camera = it.cameraSection ? (it.cameraSection.cameraAction.rawValue === 6) : false
-            targets.push({ coordinate: it.coordinate, camera: camera, yaw: -1 })
+            // Click-to-place on the map has no per-target checkbox: the banner
+            // "Anchor" applies to every target. Use Table for per-target selection.
+            targets.push({ coordinate: it.coordinate, camera: camera, yaw: -1,
+                           anchor: starMissionAnchorCheck.checked })
         }
         var depth       = _starMissionDepth(starMissionDepthField.text)
         var autoDepth   = starMissionAutoDepthCheck.checked
         var surface     = _starMissionClearance(starMissionSurfaceField.text)
         var bottom      = _starMissionClearance(starMissionBottomField.text)
+        var photoBefore = _starMissionWait(starMissionPhotoBeforeField.text)
+        var photoWindow = _starMissionWait(starMissionPhotoWindowField.text)
         _exitStarMissionMode()
         if (targets.length > 0) {
-            _starMissionCreator.createFullPlan(home, targets, depth, autoDepth, surface, bottom)
+            _starMissionCreator.createFullPlan(home, targets, depth, autoDepth, surface, bottom,
+                                               photoBefore, photoWindow)
         }
     }
 
@@ -852,6 +866,40 @@ Item {
                     }
                 }
 
+                // Anchor + photo timing. With Anchor on, the vehicle drops anchor at
+                // the photo point: it locks the position and does not advance until it
+                // has stayed inside the settle radius continuously (requires aurapilot
+                // MAV_CMD_AURA_ANCHOR / 31010 support).
+                RowLayout {
+                    Layout.alignment:   Qt.AlignHCenter
+                    spacing:            ScreenTools.defaultFontPixelWidth
+
+                    QGCCheckBox {
+                        id:     starMissionAnchorCheck
+                        text:   qsTr("Anchor")
+                    }
+
+                    QGCLabel { text: qsTr("Foto öncesi (sn)") }
+
+                    QGCTextField {
+                        id:                     starMissionPhotoBeforeField
+                        Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 7
+                        placeholderText:        _starMissionSettings.photoBefore.valueString
+                        // CONDITION_DELAY before the shutter. Empty = the App Settings ->
+                        // Mission One value shown as the placeholder.
+                    }
+
+                    QGCLabel { text: qsTr("Foto penceresi (sn)") }
+
+                    QGCTextField {
+                        id:                     starMissionPhotoWindowField
+                        Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 7
+                        placeholderText:        _starMissionSettings.photoWindow.valueString
+                        // Duration of the photo-window waypoint (of the anchor when Anchor is on).
+                        // Empty = the App Settings -> Mission One value.
+                    }
+                }
+
                 RowLayout {
                     Layout.alignment:   Qt.AlignHCenter
                     spacing:            ScreenTools.defaultFontPixelWidth
@@ -863,7 +911,10 @@ Item {
                                                                                     depthText:   starMissionDepthField.text,
                                                                                     autoDepth:   starMissionAutoDepthCheck.checked,
                                                                                     surfaceText: starMissionSurfaceField.text,
-                                                                                    bottomText:  starMissionBottomField.text }).open()
+                                                                                    bottomText:  starMissionBottomField.text,
+                                                                                    anchorAll:   starMissionAnchorCheck.checked,
+                                                                                    photoBeforeText: starMissionPhotoBeforeField.text,
+                                                                                    photoWindowText: starMissionPhotoWindowField.text }).open()
 
                         function _mapCenter() {
                             var centerPoint = Qt.point(editorMap.centerViewport.left + (editorMap.centerViewport.width / 2), editorMap.centerViewport.top + (editorMap.centerViewport.height / 2))
@@ -1129,6 +1180,9 @@ Item {
             property bool   autoDepth:      false
             property string surfaceText:    ""
             property string bottomText:     ""
+            property bool   anchorAll:      false   ///< banner "Anchor" seeds every row's checkbox
+            property string photoBeforeText: ""     ///< CONDITION_DELAY before the shutter (s)
+            property string photoWindowText: ""     ///< hold on the photo-window waypoint (s)
             property int    wpCount:    3       ///< grown by the "+ Waypoint" button
 
             property real _labelWidth:  ScreenTools.defaultFontPixelWidth * 12
@@ -1150,7 +1204,8 @@ Item {
                     }
                     targets.push({ coordinate: _coord(row.latText, row.lonText),
                                    camera:     row.camOn,
-                                   yaw:        (row.camOn && row.yawText.length > 0) ? parseFloat(row.yawText) : -1 })
+                                   yaw:        (row.camOn && row.yawText.length > 0) ? parseFloat(row.yawText) : -1,
+                                   anchor:     row.anchorOn })
                 }
                 if (targets.length === 0) {
                     return
@@ -1160,7 +1215,9 @@ Item {
                 planCreator.createFullPlan(_coord(homeLat.text, homeLon.text), targets, depth,
                                            autoDepthCheck.checked,
                                            _starMissionClearance(surfaceClearanceField.text),
-                                           _starMissionClearance(bottomClearanceField.text))
+                                           _starMissionClearance(bottomClearanceField.text),
+                                           _starMissionWait(photoBeforeField.text),
+                                           _starMissionWait(photoWindowField.text))
             }
 
             ColumnLayout {
@@ -1174,6 +1231,7 @@ Item {
                     QGCLabel { text: qsTr("Lon");      font.bold: true; Layout.preferredWidth: _latLonWidth }
                     QGCLabel { text: qsTr("Camera");   font.bold: true }
                     QGCLabel { text: qsTr("Yaw (°)");  font.bold: true }
+                    QGCLabel { text: qsTr("Anchor");   font.bold: true }
                 }
 
                 RowLayout {
@@ -1193,16 +1251,22 @@ Item {
 
                         // Read back by onAccepted; the row keeps its own state so
                         // adding a waypoint never disturbs the ones already typed.
-                        property alias latText: latField.text
-                        property alias lonText: lonField.text
-                        property alias camOn:   camCheck.checked
-                        property alias yawText: yawField.text
+                        property alias latText:   latField.text
+                        property alias lonText:   lonField.text
+                        property alias camOn:     camCheck.checked
+                        property alias yawText:   yawField.text
+                        property alias anchorOn:  anchorCheck.checked
 
                         QGCLabel     { text: qsTr("Waypoint %1").arg(index + 1); Layout.preferredWidth: _labelWidth }
                         QGCTextField { id: latField;  Layout.preferredWidth: _latLonWidth; placeholderText: qsTr("Lat") }
                         QGCTextField { id: lonField;  Layout.preferredWidth: _latLonWidth; placeholderText: qsTr("Lon") }
                         QGCCheckBox  { id: camCheck;  text: qsTr("On"); checked: true }
                         QGCTextField { id: yawField;  Layout.preferredWidth: _yawWidth; enabled: camCheck.checked; placeholderText: qsTr("auto") }
+                        // Anchor: the vehicle drops anchor at this location — it locks the
+                        // point and does not advance to the next waypoint until it has stayed
+                        // inside the settle radius continuously. Requires the aurapilot fork's
+                        // MAV_CMD_AURA_ANCHOR (31010) support.
+                        QGCCheckBox  { id: anchorCheck; text: qsTr("On"); checked: anchorAll }
                     }
                 }
 
@@ -1279,6 +1343,39 @@ Item {
                         placeholderText:        qsTr("1.0")
                         enabled:                autoDepthCheck.checked
                         // Clearance held above the sea floor while cruising (m).
+                    }
+                }
+
+                // Foto zamanlaması: üretilen plandaki iki bekleme. Boş bırakılırsa
+                // varsayılanlar (3 / 5 sn) kullanılır — elle doğrulanmış planla aynı.
+                RowLayout {
+                    spacing:            ScreenTools.defaultFontPixelWidth
+                    Layout.fillWidth:   true
+
+                    QGCLabel { text: qsTr("Foto öncesi (sn)") }
+
+                    QGCTextField {
+                        id:                     photoBeforeField
+                        Layout.preferredWidth:  _yawWidth
+                        text:                   photoBeforeText
+                        placeholderText:        _starMissionSettings.photoBefore.valueString
+                        // CONDITION_DELAY before the shutter. Empty = the App Settings ->
+                        // Mission One value shown as the placeholder.
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    QGCLabel { text: qsTr("Foto penceresi (sn)") }
+
+                    QGCTextField {
+                        id:                     photoWindowField
+                        Layout.preferredWidth:  _yawWidth
+                        text:                   photoWindowText
+                        placeholderText:        _starMissionSettings.photoWindow.valueString
+                        // Hold time of the photo-window waypoint (anchor duration when Anchor
+                        // is on). 2 s is added on top when the camera turns; it cannot be
+                        // shorter than the queue, otherwise AP_Mission drops the queue and no
+                        // photo is taken.
                     }
                 }
             }
@@ -1387,10 +1484,13 @@ Item {
                     model: _planMasterController.planCreators
 
                     Rectangle {
-                        id:     button
-                        width:  ScreenTools.defaultFontPixelHeight * 7
-                        height: planCreatorNameLabel.y + planCreatorNameLabel.height
-                        color:  button.pressed || button.highlighted ? qgcPal.buttonHighlight : qgcPal.button
+                        id:             button
+                        // Implicit sizes (not width/height) so the layout keeps following
+                        // the label: a wrapped two-line name makes the tile taller instead
+                        // of being cut off by a height the layout latched onto early.
+                        implicitWidth:  ScreenTools.defaultFontPixelHeight * 7
+                        implicitHeight: planCreatorNameLabel.y + planCreatorNameLabel.height
+                        color:          button.pressed || button.highlighted ? qgcPal.buttonHighlight : qgcPal.button
 
                         property bool highlighted: mouseArea.containsMouse
                         property bool pressed:     mouseArea.pressed
@@ -1411,6 +1511,10 @@ Item {
                             anchors.left:           parent.left
                             anchors.right:          parent.right
                             horizontalAlignment:    Text.AlignHCenter
+                            // Long names ("AUV Stars 2026 Mission One") are wider than the
+                            // tile and used to paint out over both of its sides; wrap onto
+                            // a second line instead and let the tile grow to fit.
+                            wrapMode:               Text.WordWrap
                             text:                   object.name
                             color:                  button.pressed || button.highlighted ? qgcPal.buttonHighlightText : qgcPal.buttonText
                         }
