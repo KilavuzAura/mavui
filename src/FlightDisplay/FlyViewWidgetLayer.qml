@@ -70,30 +70,43 @@ Item {
         bottomEdgeRightInset:   virtualJoystickMultiTouch.visible ? virtualJoystickMultiTouch.bottomEdgeRightInset : bottomRightRowLayout.bottomEdgeRightInset
     }
 
-    FlyViewTopRightPanel {
-        id:                     topRightPanel
+    // Jump-to-mission-item box. Sits above both top-right panels so it stays put
+    // no matter which of them is showing.
+    MissionItemSelector {
+        id:                     missionItemSelector
         anchors.top:            parent.top
         anchors.right:          parent.right
         anchors.topMargin:      _layoutMargin
         anchors.rightMargin:    _layoutMargin
-        maximumHeight:          parent.height - (bottomRightRowLayout.height + _margins * 5)
 
-        property real topEdgeRightInset:    height + _layoutMargin
-        property real rightEdgeTopInset:    width + _layoutMargin
+        property real stackedHeight: visible ? height + _layoutSpacing : 0
+    }
+
+    FlyViewTopRightPanel {
+        id:                     topRightPanel
+        anchors.top:            missionItemSelector.bottom
+        anchors.right:          parent.right
+        anchors.topMargin:      missionItemSelector.visible ? _layoutSpacing : 0
+        anchors.rightMargin:    _layoutMargin
+        maximumHeight:          parent.height - (bottomRightRowLayout.height + missionItemSelector.stackedHeight + _margins * 5)
+
+        property real topEdgeRightInset:    missionItemSelector.stackedHeight + height + _layoutMargin
+        property real rightEdgeTopInset:    Math.max(width, missionItemSelector.width) + _layoutMargin
         property real rightEdgeCenterInset: rightEdgeTopInset
     }
 
     FlyViewTopRightColumnLayout {
         id:                 topRightColumnLayout
         anchors.margins:    _layoutMargin
-        anchors.top:        parent.top
+        anchors.top:        missionItemSelector.bottom
+        anchors.topMargin:  missionItemSelector.visible ? _layoutSpacing : 0
         anchors.bottom:     bottomRightRowLayout.top
         anchors.right:      parent.right
         spacing:            _layoutSpacing
         visible:           !topRightPanel.visible
 
-        property real topEdgeRightInset:    childrenRect.height + _layoutMargin
-        property real rightEdgeTopInset:    width + _layoutMargin
+        property real topEdgeRightInset:    missionItemSelector.stackedHeight + childrenRect.height + _layoutMargin
+        property real rightEdgeTopInset:    Math.max(width, missionItemSelector.width) + _layoutMargin
         property real rightEdgeCenterInset: rightEdgeTopInset
     }
 

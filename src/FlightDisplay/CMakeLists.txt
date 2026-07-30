@@ -42,6 +42,7 @@ qt_add_qml_module(FlightDisplayModule
         GuidedToolStripAction.qml
         GuidedValueSlider.qml
         MultiRotorChecklist.qml
+        MissionItemSelector.qml
         MultiVehicleList.qml
         ObstacleDistanceOverlay.qml
         ObstacleDistanceOverlayMap.qml
