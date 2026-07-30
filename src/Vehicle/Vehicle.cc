@@ -168,6 +168,11 @@ Vehicle::Vehicle(LinkInterface*             link,
     _mavCommandResponseCheckTimer.start();
     connect(&_mavCommandResponseCheckTimer, &QTimer::timeout, this, &Vehicle::_sendMavCommandResponseTimeoutCheck);
 
+    // Manual GPS position injection, see startGPSLocationInjection()
+    _gpsInjectionTimer.setSingleShot(false);
+    _gpsInjectionTimer.setInterval(_gpsInjectionIntervalMSecs);
+    connect(&_gpsInjectionTimer, &QTimer::timeout, this, &Vehicle::_sendGPSLocationInjection);
+
     // MAV_TYPE_GENERIC is used by unit test for creating a vehicle which doesn't do the connect sequence. This
     // way we can test the methods that are used within the connect sequence.
     if (!qgcApp()->runningUnitTests() || _vehicleType != MAV_TYPE_GENERIC) {
@@ -1704,6 +1709,78 @@ QVariantList Vehicle::links() const {
     return ret;
 }
 #endif
+
+void Vehicle::startGPSLocationInjection(double latitude, double longitude)
+{
+    const QGeoCoordinate coord(latitude, longitude);
+    if (!coord.isValid()) {
+        qgcApp()->showAppMessage(tr("Set GPS: latitude/longitude out of range."));
+        return;
+    }
+
+    _gpsInjectionCoord = coord;
+    _sendGPSLocationInjection();        // do not make the operator wait for the first tick
+    if (!_gpsInjectionTimer.isActive()) {
+        _gpsInjectionTimer.start();
+        emit gpsLocationInjectionActiveChanged();
+    }
+}
+
+void Vehicle::stopGPSLocationInjection()
+{
+    if (_gpsInjectionTimer.isActive()) {
+        _gpsInjectionTimer.stop();
+        emit gpsLocationInjectionActiveChanged();
+    }
+}
+
+void Vehicle::_sendGPSLocationInjection()
+{
+    SharedLinkInterfacePtr sharedLink = vehicleLinkManager()->primaryLink().lock();
+    if (!sharedLink) {
+        return;
+    }
+
+    // Everything we genuinely do not know is flagged as ignored rather than sent as a
+    // zero: a zeroed velocity or accuracy is a measurement claim, and EKF3 would fuse
+    // it. Altitude is ignored too - the sub reads its own depth from the barometer,
+    // which is far better than anything we could state here.
+    const uint16_t ignoreFlags =
+        GPS_INPUT_IGNORE_FLAG_ALT |
+        GPS_INPUT_IGNORE_FLAG_VEL_HORIZ |
+        GPS_INPUT_IGNORE_FLAG_VEL_VERT |
+        GPS_INPUT_IGNORE_FLAG_SPEED_ACCURACY |
+        GPS_INPUT_IGNORE_FLAG_VERTICAL_ACCURACY;
+
+    mavlink_message_t msg;
+    mavlink_msg_gps_input_pack_chan(
+        MAVLinkProtocol::instance()->getSystemId(),
+        MAVLinkProtocol::getComponentId(),
+        sharedLink->mavlinkChannel(),
+        &msg,
+        0,                      // time_usec, 0 = use arrival time
+        0,                      // gps_id
+        ignoreFlags,
+        0,                      // time_week_ms
+        0,                      // time_week
+        3,                      // fix_type: 3D fix
+        static_cast<int32_t>(qRound(_gpsInjectionCoord.latitude()  * 1e7)),
+        static_cast<int32_t>(qRound(_gpsInjectionCoord.longitude() * 1e7)),
+        0.0f,                   // alt (ignored above)
+        1.0f,                   // hdop
+        1.0f,                   // vdop
+        0.0f, 0.0f, 0.0f,       // vn, ve, vd (ignored above)
+        0.0f,                   // speed_accuracy (ignored above)
+        // Horizontal accuracy is NOT ignored: it is the one number that tells EKF3 how
+        // much to trust this, and an operator-typed position on a chart is worth about
+        // a few metres. Claiming better would let it fight the DVL.
+        5.0f,                   // horiz_accuracy (m)
+        0.0f,                   // vert_accuracy (ignored above)
+        10,                     // satellites_visible - enough to pass the arming check
+        0);                     // yaw, 0 = not available
+
+    sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
+}
 
 void Vehicle::requestDataStream(MAV_DATA_STREAM stream, uint16_t rate, bool sendMultiple)
 {

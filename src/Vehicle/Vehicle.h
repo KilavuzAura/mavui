@@ -140,6 +140,7 @@ public:
     Q_PROPERTY(QGeoCoordinate       armedPosition               READ armedPosition                                                  NOTIFY armedPositionChanged)
     Q_PROPERTY(bool                 armed                       READ armed                      WRITE setArmedShowError             NOTIFY armedChanged)
     Q_PROPERTY(bool                 autoDisarm                  READ autoDisarm                                                     NOTIFY autoDisarmChanged)
+    Q_PROPERTY(bool                 gpsLocationInjectionActive  READ gpsLocationInjectionActive                                     NOTIFY gpsLocationInjectionActiveChanged)
     Q_PROPERTY(bool                 flightModeSetAvailable      READ flightModeSetAvailable                                         CONSTANT)
     Q_PROPERTY(QStringList          flightModes                 READ flightModes                                                    NOTIFY flightModesChanged)
     Q_PROPERTY(QString              flightMode                  READ flightMode                 WRITE setFlightMode                 NOTIFY flightModeChanged)
@@ -409,6 +410,23 @@ public:
 
     /// Set home from flight map coordinate
     Q_INVOKABLE void doSetHome(const QGeoCoordinate& coord);
+
+    /// Feeds the autopilot a fixed GPS position (GPS_INPUT), the way SonarView's
+    /// "Pick Location" does: the vehicle has no real GPS, so it is told where it is
+    /// instead. Everything downstream - the EKF origin, home, the map, the mission -
+    /// follows from the fix, rather than being set directly.
+    ///
+    /// The position has to be streamed, not sent once. AP_GPS wipes the fix
+    /// GPS_TIMEOUT_MS (4 s) after the last message (AP_GPS.cpp:970), and EKF3 wants a
+    /// run of consistent samples before it accepts GPS at all. So this starts a 5 Hz
+    /// injection - AP_GPS caps the useful rate at GPS_MAX_RATE_MS = 200 ms - and keeps
+    /// it going until stopGPSLocationInjection().
+    ///
+    /// Needs GPS_TYPE = 14 (GPS_TYPE_MAV) on the vehicle. With GPS_TYPE = 0 the
+    /// AP_GPS_MAV backend is never created and every message is dropped in silence.
+    Q_INVOKABLE void startGPSLocationInjection(double latitude, double longitude);
+    Q_INVOKABLE void stopGPSLocationInjection();
+    bool gpsLocationInjectionActive() const { return _gpsInjectionTimer.isActive(); }
 
     /// Save the joystick enable setting to the settings group
     Q_INVOKABLE void saveJoystickSettings(void);
@@ -825,6 +843,7 @@ public slots:
     void _offlineVehicleTypeSettingChanged  (QVariant varVehicleType);  // Should only be used by MissionController to set vehicle type from Plan file
 
 signals:
+    void gpsLocationInjectionActiveChanged();
     void coordinateChanged              (QGeoCoordinate coordinate);
     void joystickEnabledChanged         (bool enabled);
     void mavlinkMessageReceived         (const mavlink_message_t& message);
@@ -919,6 +938,7 @@ signals:
     void logData                        (uint32_t ofs, uint16_t id, uint8_t count, const uint8_t* data);
 
 private slots:
+    void _sendGPSLocationInjection();
     void _mavlinkMessageReceived            (LinkInterface* link, mavlink_message_t message);
     void _sendMessageMultipleNext           ();
     void _parametersReady                   (bool parametersReady);
@@ -1205,6 +1225,12 @@ private:
 
     QList<MavCommandListEntry_t>    _mavCommandList;
     QTimer                          _mavCommandResponseCheckTimer;
+
+    // Manual GPS position injection (startGPSLocationInjection). Streamed at 5 Hz
+    // because AP_GPS drops the fix 4 s after the last GPS_INPUT.
+    QTimer                          _gpsInjectionTimer;
+    QGeoCoordinate                  _gpsInjectionCoord;
+    static constexpr int            _gpsInjectionIntervalMSecs = 200;
     static const int                _mavCommandMaxRetryCount                = 3;
     static const int                _mavCommandResponseCheckTimeoutMSecs    = 500;
     static const int                _mavCommandAckTimeoutMSecs              = 3000;

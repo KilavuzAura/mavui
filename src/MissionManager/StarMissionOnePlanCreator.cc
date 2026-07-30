@@ -9,6 +9,10 @@
 
 #include "StarMissionOnePlanCreator.h"
 #include "PlanMasterController.h"
+#include "MissionController.h"
+#include "SimpleMissionItem.h"
+#include "MissionItem.h"
+#include "QmlObjectListModel.h"
 #include "SettingsManager.h"
 #include "StarMissionSettings.h"
 
@@ -329,4 +333,99 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
     tempFile.close();
 
     _planMasterController->loadFromFile(tempPath);
+}
+
+namespace {
+// A stop is marked by its surface waypoint. Nothing else in the pattern lands near
+// kSurfaceDepth: createFullPlan() clamps the cruise depth to at most -surfaceClearance
+// (-0.3 m by default) and terrain-frame cruise legs carry a positive clearance. The
+// window is wide enough to also take plans written with -0.09 by hand or by an older
+// generator.
+bool isSurfaceWaypoint(SimpleMissionItem* item)
+{
+    if (item->command() != kCmdNavWaypoint) {
+        return false;
+    }
+    const double alt = item->altitude()->rawValue().toDouble();
+    return alt < 0.0 && std::fabs(alt - kSurfaceDepth) < 0.05;
+}
+} // namespace
+
+QVariantList StarMissionOnePlanCreator::extractTargets() const
+{
+    QVariantList targets;
+
+    MissionController* missionController = _planMasterController ? _planMasterController->missionController() : nullptr;
+    QmlObjectListModel* items = missionController ? missionController->visualItems() : nullptr;
+    if (!items) {
+        return targets;
+    }
+
+    // Walk the expanded pattern back to the targets that produced it. Index 0 is the
+    // mission settings item; after that every stop is a surface waypoint followed by
+    // the items that spell it out:
+    //     surface WP -> anchor(31010)                                   anchored stop
+    //     surface WP -> [CONDITION_YAW] CONDITION_DELAY DO_DIGICAM, WP  unanchored stop
+    // Everything else is travel: cruise legs sit at the cruise depth and a dive in
+    // place just repeats the previous coordinate, so neither can be mistaken for a
+    // stop. The plan always closes with a surface waypoint back at the start; that one
+    // ends the mission and is not a target.
+    const int count = items->count();
+    for (int i = 1; i < count; i++) {
+        SimpleMissionItem* wp = qobject_cast<SimpleMissionItem*>(items->get(i));
+        if (!wp || !isSurfaceWaypoint(wp)) {
+            continue;
+        }
+        if (i == count - 1) {
+            break;
+        }
+
+        bool   anchor = false;
+        bool   camera = false;
+        double yaw    = kNoYaw;
+
+        for (int j = i + 1; j < count; j++) {
+            SimpleMissionItem* it = qobject_cast<SimpleMissionItem*>(items->get(j));
+            if (!it) {
+                break;
+            }
+            const int cmd = it->command();
+            if (cmd == kCmdAuraAnchor) {
+                // param5 heading (negative = no turn), param6 shutter - the same
+                // convention mavlink_int_to_mission_cmd() reads on the vehicle.
+                anchor = true;
+                yaw    = it->missionItem().param5() >= 0.0 ? it->missionItem().param5() : double(kNoYaw);
+                camera = !qFuzzyIsNull(it->missionItem().param6());
+                i = j;
+                break;
+            }
+            if (cmd == kCmdConditionYaw) {
+                yaw = it->missionItem().param1();
+                continue;
+            }
+            if (cmd == kCmdDoDigicamControl) {
+                camera = true;
+                continue;
+            }
+            if (cmd == kCmdConditionDelay) {
+                continue;
+            }
+            // The unanchored path parks a second surface waypoint on the same spot to
+            // hold the photo window. Swallow it so it does not come back as a duplicate
+            // target one metre from the first.
+            if (isSurfaceWaypoint(it) && it->coordinate().distanceTo(wp->coordinate()) < 1.0) {
+                i = j;
+            }
+            break;      // any other coordinate item is the dive out of this stop
+        }
+
+        QVariantMap target;
+        target[QStringLiteral("coordinate")] = QVariant::fromValue(wp->coordinate());
+        target[QStringLiteral("camera")]     = camera;
+        target[QStringLiteral("yaw")]        = camera ? yaw : double(kNoYaw);
+        target[QStringLiteral("anchor")]     = anchor;
+        targets.append(target);
+    }
+
+    return targets;
 }

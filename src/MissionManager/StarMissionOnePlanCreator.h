@@ -66,6 +66,16 @@ public:
                                     double                 photoWindow      = kUseSetting,
                                     bool                   startAnchor      = false);
 
+    /// Reads an already-loaded plan back into the target list that produced it, so the
+    /// placement mode and the table can start from an existing plan instead of a blank
+    /// sheet. Returns maps in exactly the shape createFullPlan() takes:
+    ///     { "coordinate": QGeoCoordinate, "camera": bool, "yaw": double, "anchor": bool }
+    /// Only the stops are recovered - the cruise depth, the holds and the anchor tuning
+    /// are not read back, because they live in the UI boxes and StarMissionSettings.
+    /// Returns an empty list when the loaded plan does not look like one of ours, which
+    /// is the caller's signal that replacing it would lose work.
+    Q_INVOKABLE QVariantList extractTargets() const;
+
     static constexpr double kDefaultCruiseDepth      = -1.0; ///< used when the UI leaves the depth box empty
     static constexpr double kDefaultSurfaceClearance =  0.3; ///< shallowest a cruise leg may be commanded (m below surface)
     static constexpr double kDefaultBottomClearance  =  1.0; ///< terrain-frame cruise altitude above the floor (m)

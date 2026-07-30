@@ -51,6 +51,8 @@ Item {
     property bool   _singleComplexItem:                 _missionController.complexMissionItemNames.length === 1
     property bool   _starMissionMode:                   false   ///< Star Mission One placement mode active
     property bool   _starMissionHomeSet:                false   ///< first map click in the mode sets home, rest add targets
+    property bool   _starMissionSetStart:               false   ///< armed by the banner: next map click re-places the start point
+    property var    _starMissionSeed:                   []      ///< per-target yaw/anchor recovered from the plan the mode was opened on
     property var    _starMissionCreator:                null    ///< the StarMissionOne plan creator (for the table entry path)
      property int    _editingLayer:                      {if(!_utmspEnabled){layerTabBar.currentIndex ? _layers[layerTabBar.currentIndex] : _layerMission}else{layerTabBarUTMSP.currentIndex ? _layersUTMSP[layerTabBarUTMSP.currentIndex] : _layerMission}}
     property int    _toolStripBottom:                   toolStrip.height + toolStrip.y
@@ -273,14 +275,93 @@ Item {
     // ---- Star Mission One placement mode ----
     function _startStarMissionMode(creator) {
         _starMissionCreator = creator
+        // Read an already-loaded plan back into its targets BEFORE removeAll() destroys
+        // it, then put them back on the map. From there the mode behaves exactly as if
+        // the user had just clicked them, so the map, the Table, Undo and Finish all
+        // work unchanged - and reopening the mode on a plan no longer means retyping it.
+        var recovered = _planMasterController.containsItems ? creator.extractTargets() : []
+        var start     = _missionController.plannedHomePosition
         _planMasterController.removeAll()
-        _starMissionHomeSet = false
-        _starMissionMode    = true
+        _starMissionHomeSet  = false
+        _starMissionSetStart = false
+        _starMissionSeed     = recovered
+        _starMissionMode     = true
+        // Arm the Waypoint tool so entering the mode still means "click to place",
+        // but the user can now switch it off to pan or select without placing.
+        addWaypointRallyPointAction.checked = true
+        _starMissionRestore(start, recovered)
+    }
+
+    // Puts targets recovered from an existing plan back on the map as ordinary placed
+    // points. Their heading and anchor flag cannot live on a map item, so they stay in
+    // _starMissionSeed and are re-attached by index in _starMissionPlacedTargets().
+    function _starMissionRestore(start, targets) {
+        if (targets.length === 0) {
+            return
+        }
+        var settingsItem = _visualItems.get(0)
+        if (settingsItem && start && start.isValid) {
+            settingsItem.coordinate = start
+            _starMissionHomeSet = true
+        }
+        for (var i = 0; i < targets.length; i++) {
+            var item = _missionController.insertSimpleMissionItem(targets[i].coordinate, -1, false /* makeCurrentItem */)
+            if (item && item.cameraSection) {
+                item.cameraSection.cameraAction.rawValue = targets[i].camera ? 6 : 0   // TakePhoto : None
+            }
+        }
+        // Leave the start point selected, so it is the one thing already draggable.
+        _missionController.setCurrentPlanViewSeqNum(0, true)
     }
 
     function _exitStarMissionMode() {
         _starMissionMode = false
         _starMissionHomeSet = false
+        _starMissionSetStart = false
+        _starMissionSeed = []
+        addWaypointRallyPointAction.checked = false
+    }
+
+    // Start point currently placed on the map, or null if nothing has been placed.
+    function _starMissionStartCoord() {
+        var settingsItem = _visualItems.get(0)
+        if (!_starMissionHomeSet || !settingsItem || !settingsItem.coordinate.isValid) {
+            return null
+        }
+        return settingsItem.coordinate
+    }
+
+    // Targets currently placed on the map, in order. Lets the Table open on what is
+    // already there instead of a blank sheet: click roughly where the targets go,
+    // then open the table to type exact coordinates and per-target headings. Without
+    // this the table seeded Home from the map centre and threw the placement away.
+    function _starMissionPlacedTargets() {
+        var targets = []
+        for (var i = 1; i < _visualItems.count; i++) {
+            var it = _visualItems.get(i)
+            if (!it.specifiesCoordinate) {
+                continue
+            }
+            // A map item cannot carry a camera heading or an anchor flag. For targets
+            // recovered from an existing plan those come back from _starMissionSeed by
+            // index; anything clicked afterwards falls back to no heading and the
+            // banner's Anchor box.
+            var seed = targets.length < _starMissionSeed.length ? _starMissionSeed[targets.length] : null
+            targets.push({ coordinate: it.coordinate,
+                           camera:     it.cameraSection ? (it.cameraSection.cameraAction.rawValue === 6) : false,
+                           yaw:        seed ? seed.yaw : -1,
+                           anchor:     seed ? seed.anchor : starMissionAnchorCheck.checked })
+        }
+        return targets
+    }
+
+    // Drops the last placed target. A stray map click used to be unrecoverable:
+    // every click adds a target and Finish sweeps every item after index 0 into
+    // the plan, so the only way out was Cancel, which wipes the whole placement.
+    function _starMissionUndo() {
+        if (_visualItems.count > 1) {
+            _missionController.removeVisualItem(_visualItems.count - 1)
+        }
     }
 
     function _cancelStarMissionMode() {
@@ -288,15 +369,23 @@ Item {
         _exitStarMissionMode()
     }
 
-    // Handles a map click while in Star Mission One mode: first click places the
-    // home position, every following click adds a target waypoint (camera on by default).
+    // Handles a map click while in Star Mission One mode: the first click places the
+    // start point, every following click adds a target waypoint (camera on by default).
+    // The banner's "Move start" button re-arms the start branch, because _starMissionHomeSet
+    // used to be a one-way latch: a misplaced first click could only be undone by
+    // Cancel, which throws away every target placed since.
     function _starMissionMapClick(coordinate) {
-        if (!_starMissionHomeSet) {
-            var settingsItem = _visualItems.get(0)   // index 0 is always the mission settings (home) item
+        if (!_starMissionHomeSet || _starMissionSetStart) {
+            var settingsItem = _visualItems.get(0)   // index 0 is always the mission settings (start) item
             if (settingsItem) {
                 settingsItem.coordinate = coordinate
             }
-            _starMissionHomeSet = true
+            _starMissionHomeSet  = true
+            _starMissionSetStart = false
+            // Select it, so its drag handle appears: SimpleItemMapVisual only shows the
+            // drag area for the current item, and this flow never made index 0 current -
+            // the start point could be placed but then never nudged on the map.
+            _missionController.setCurrentPlanViewSeqNum(0, true)
         } else {
             var item = _missionController.insertSimpleMissionItem(coordinate, -1, true /* makeCurrentItem */)
             if (item && item.cameraSection) {
@@ -338,18 +427,10 @@ Item {
             return
         }
         var home = _visualItems.get(0).coordinate
-        var targets = []
-        for (var i = 1; i < _visualItems.count; i++) {
-            var it = _visualItems.get(i)
-            if (!it.specifiesCoordinate) {
-                continue
-            }
-            var camera = it.cameraSection ? (it.cameraSection.cameraAction.rawValue === 6) : false
-            // Click-to-place on the map has no per-target checkbox: the banner
-            // "Anchor" applies to every target. Use Table for per-target selection.
-            targets.push({ coordinate: it.coordinate, camera: camera, yaw: -1,
-                           anchor: starMissionAnchorCheck.checked })
-        }
+        // Same list the Table opens on. Click-to-place has no per-target checkbox, so
+        // the banner "Anchor" applies to every freshly clicked target; targets carried
+        // over from an existing plan keep their own heading and anchor flag.
+        var targets = _starMissionPlacedTargets()
         var depth       = _starMissionDepth(starMissionDepthField.text)
         var autoDepth   = starMissionAutoDepthCheck.checked
         var surface     = _starMissionClearance(starMissionSurfaceField.text)
@@ -481,7 +562,15 @@ Item {
                 }
 
                 if (_starMissionMode) {
-                    _starMissionMapClick(coordinate)
+                    // Gate on the Waypoint tool exactly like the normal plan flow below.
+                    // The mode used to swallow every map click unconditionally, so panning,
+                    // dismissing a popup or trying to select the start marker all dropped a
+                    // target wherever you happened to touch - and Finish sweeps every item
+                    // after index 0 into the plan, so those strays became real survey stops.
+                    // "Move start" stays exempt: it is an explicit one-shot from the banner.
+                    if (addWaypointRallyPointAction.checked || _starMissionSetStart) {
+                        _starMissionMapClick(coordinate)
+                    }
                     return
                 }
 
@@ -806,10 +895,14 @@ Item {
                     }
 
                     QGCLabel {
-                        text:               _starMissionHomeSet
-                                                ? qsTr("Click map to add targets")
-                                                : qsTr("Click map to set Home position")
-                        color:              qgcPal.colorGrey
+                        text:               _starMissionSetStart
+                                                ? qsTr("Click map to move the start point")
+                                                : !addWaypointRallyPointAction.checked
+                                                    ? qsTr("Waypoint tool off - map clicks place nothing")
+                                                    : _starMissionHomeSet
+                                                        ? qsTr("Click map to add targets")
+                                                        : qsTr("Click map to set the start point")
+                        color:              _starMissionSetStart ? qgcPal.warningText : qgcPal.colorGrey
                         font.pointSize:     ScreenTools.smallFontPointSize
                         wrapMode:           Text.WordWrap
                         Layout.maximumWidth: starMissionBannerCol._maxTextWidth / 2
@@ -877,16 +970,25 @@ Item {
                     spacing:            ScreenTools.defaultFontPixelWidth
 
                     QGCCheckBox {
-                        id:     starMissionAnchorCheck
-                        text:   qsTr("Anchor")
+                        id:      starMissionAnchorCheck
+                        text:    qsTr("Anchor")
+                        // On by default: without the anchor a stop is only held by
+                        // AC_WPNav's latched arrival, so the vehicle can drift off the
+                        // point while the hold timer runs, and the camera turn plus the
+                        // shutter go back to being separate queue items that a short
+                        // hold silently drops.
+                        checked: true
                     }
 
                     QGCCheckBox {
-                        id:     starMissionStartAnchorCheck
-                        text:   qsTr("Start anchor")
+                        id:      starMissionStartAnchorCheck
+                        text:    qsTr("Start anchor")
                         // Anchors once at the start point, right after the dive in place
                         // and before the first travel leg, so the mission departs from a
                         // position the vehicle has actually held. No photo, no turn.
+                        // On by default: the dive drags the vehicle off the start point,
+                        // and without this gate that error is carried into every target.
+                        checked: true
                     }
 
                     QGCLabel { text: qsTr("Foto öncesi (sn)") }
@@ -917,8 +1019,24 @@ Item {
                     spacing:            ScreenTools.defaultFontPixelWidth
 
                     QGCButton {
+                        text:       qsTr("Move start")
+                        checkable:  true
+                        checked:    _starMissionSetStart
+                        enabled:    _starMissionHomeSet
+                        onClicked:  _starMissionSetStart = checked
+                    }
+
+                    QGCButton {
+                        text:       qsTr("Undo")
+                        enabled:    _visualItems.count > 1
+                        onClicked:  _starMissionUndo()
+                    }
+
+                    QGCButton {
                         text:       qsTr("Table")
                         onClicked:  starMissionOneDialog.createObject(mainWindow, { mapCenter: _mapCenter(),
+                                                                                    startCoord:  _starMissionStartCoord(),
+                                                                                    seedTargets: _starMissionPlacedTargets(),
                                                                                     planCreator: _starMissionCreator,
                                                                                     depthText:   starMissionDepthField.text,
                                                                                     autoDepth:   starMissionAutoDepthCheck.checked,
@@ -1180,6 +1298,25 @@ Item {
     }
 
     Component {
+        id: starMissionReplacePromptDialog
+
+        QGCSimpleMessageDialog {
+            title:      qsTr("AUV Stars 2026 Mission One")
+            // Says what survives, because that is the whole question the operator has:
+            // a plan this creator made comes back target for target, anything else does not.
+            text:       recovered.length > 0
+                            ? qsTr("Replace the current plan?\n\n%1 target(s) will be carried over with their headings and anchor flags. The cruise depth, the holds and the photo timings are not read back — check the boxes before you finish.").arg(recovered.length)
+                            : qsTr("Replace the current plan?\n\nIt does not look like an AUV Stars 2026 Mission One plan, so nothing can be carried over and it will be lost.")
+            buttons:    Dialog.Yes | Dialog.No
+
+            property var planCreator
+            property var recovered: []
+
+            onAccepted: _startStarMissionMode(planCreator)
+        }
+    }
+
+    Component {
         id: starMissionOneDialog
 
         QGCPopupDialog {
@@ -1188,6 +1325,10 @@ Item {
 
             property var    planCreator
             property var    mapCenter
+            // What is already placed on the map. The table opens on top of it instead
+            // of discarding it: rough it out by clicking, then refine here.
+            property var    startCoord:     null    ///< placed start point, null = nothing placed yet
+            property var    seedTargets:    []      ///< placed targets, in order
             // Seeded from the banner so opening the table keeps what was typed there.
             property string depthText:      ""
             property bool   autoDepth:      false
@@ -1197,7 +1338,13 @@ Item {
             property bool   startAnchor:    false   ///< banner "Start anchor" seeds the Home row checkbox
             property string photoBeforeText: ""     ///< CONDITION_DELAY before the shutter (s)
             property string photoWindowText: ""     ///< hold on the photo-window waypoint (s)
-            property int    wpCount:    3       ///< grown by the "+ Waypoint" button
+            property int    wpCount:    0       ///< rows; sized on completion, grown by "+ Waypoint"
+
+            // Size the table only once createObject has applied seedTargets. Binding
+            // wpCount to seedTargets.length instead would race: the rows get built
+            // during creation, while seedTargets is still the empty default, so their
+            // Component.onCompleted could seed from nothing. Always one spare blank row.
+            Component.onCompleted: wpCount = Math.max(3, seedTargets.length + 1)
 
             property real _labelWidth:  ScreenTools.defaultFontPixelWidth * 12
             property real _latLonWidth: ScreenTools.defaultFontPixelWidth * 12
@@ -1253,8 +1400,12 @@ Item {
                     spacing: ScreenTools.defaultFontPixelWidth
 
                     QGCLabel     { text: qsTr("Home"); Layout.preferredWidth: _labelWidth }
-                    QGCTextField { id: homeLat; Layout.preferredWidth: _latLonWidth; text: mapCenter ? mapCenter.latitude.toFixed(7) : "" }
-                    QGCTextField { id: homeLon; Layout.preferredWidth: _latLonWidth; text: mapCenter ? mapCenter.longitude.toFixed(7) : "" }
+                    // Prefer the start point already placed on the map; the map centre is
+                    // only a fallback for opening the table without placing anything.
+                    QGCTextField { id: homeLat; Layout.preferredWidth: _latLonWidth
+                                   text: startCoord ? startCoord.latitude.toFixed(7)  : (mapCenter ? mapCenter.latitude.toFixed(7)  : "") }
+                    QGCTextField { id: homeLon; Layout.preferredWidth: _latLonWidth
+                                   text: startCoord ? startCoord.longitude.toFixed(7) : (mapCenter ? mapCenter.longitude.toFixed(7) : "") }
                     // Start anchor: dropped once at the start point, after the dive in
                     // place and before the first travel leg. It is a departure gate, not
                     // a photo point — no camera turn and no shutter here.
@@ -1275,6 +1426,22 @@ Item {
                         property alias camOn:     camCheck.checked
                         property alias yawText:   yawField.text
                         property alias anchorOn:  anchorCheck.checked
+
+                        // Fill in what is already placed on the map, including anything
+                        // carried over from an existing plan. Assigned rather than bound
+                        // so typing over a seeded value sticks.
+                        Component.onCompleted: {
+                            if (index < seedTargets.length) {
+                                var t = seedTargets[index]
+                                latField.text      = t.coordinate.latitude.toFixed(7)
+                                lonField.text      = t.coordinate.longitude.toFixed(7)
+                                camCheck.checked   = t.camera
+                                anchorCheck.checked = t.anchor
+                                // Negative means "no turn" all the way down to the
+                                // firmware, so it shows as an empty (auto) box.
+                                yawField.text      = t.yaw >= 0 ? String(t.yaw) : ""
+                            }
+                        }
 
                         QGCLabel     { text: qsTr("Waypoint %1").arg(index + 1); Layout.preferredWidth: _labelWidth }
                         QGCTextField { id: latField;  Layout.preferredWidth: _latLonWidth; placeholderText: qsTr("Lat") }
@@ -1546,7 +1713,15 @@ Item {
                             preventStealing:    true
                             onClicked:          {
                                 if (object.interactive) {
-                                    _startStarMissionMode(object)
+                                    // The interactive creator wipes the plan on entry, so it
+                                    // has to ask like the others do - it used to be the one
+                                    // path that destroyed a loaded plan without a word.
+                                    if (_planMasterController.containsItems) {
+                                        starMissionReplacePromptDialog.createObject(mainWindow, { planCreator: object,
+                                                                                                  recovered:   object.extractTargets() }).open()
+                                    } else {
+                                        _startStarMissionMode(object)
+                                    }
                                 } else if (_planMasterController.containsItems) {
                                     createPlanRemoveAllPromptDialog.createObject(mainWindow, { mapCenter: _mapCenter(), planCreator: object }).open()
                                 } else {
