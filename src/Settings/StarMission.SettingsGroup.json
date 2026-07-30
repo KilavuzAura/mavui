@@ -27,7 +27,7 @@
 {
     "name":         "anchorGuard",
     "shortDesc":    "Anchor guard timeout",
-    "longDesc":     "Overall ceiling on a single anchor command, counted from when it starts. Guarantees the mission advances even if the vehicle can never settle. 0 uses the firmware default of duration*3 + 30 s.",
+    "longDesc":     "Overall ceiling on a single anchor command, counted from when it starts. Guarantees the mission advances even if the vehicle can never settle, or never finishes turning. 0 lets the firmware work one out from the duration, the pre-shutter wait and whether there is a turn.",
     "type":         "uint16",
     "default":      0,
     "units":        "s",
@@ -37,7 +37,7 @@
 {
     "name":         "photoBefore",
     "shortDesc":    "Delay before shutter",
-    "longDesc":     "CONDITION_DELAY inserted after the camera turn and before the shutter fires, so the vehicle has settled on heading when the photo is taken.",
+    "longDesc":     "Wait between finishing the camera turn and firing the shutter, so the vehicle has stopped swinging when the photo is taken. With Anchor on this runs inside the anchor command (max 31 s); without it, it is a CONDITION_DELAY item.",
     "type":         "double",
     "default":      3.0,
     "units":        "s",
@@ -48,7 +48,7 @@
 {
     "name":         "photoWindow",
     "shortDesc":    "Photo window / anchor duration",
-    "longDesc":     "Hold time of the photo-window waypoint, and the anchor duration when Anchor is on. A camera turn adds 2 s on top. It must be longer than the DO/CONDITION queue, otherwise AP_Mission drops the queue and no photo is taken.",
+    "longDesc":     "How long the vehicle stays on the point. With Anchor on this is the plain hold AFTER the shutter, because the anchor sequences the turn and the shutter itself. Without Anchor it is the whole photo window and has to outlast the turn plus the delay above, otherwise AP_Mission drops the queue and no photo is taken.",
     "type":         "double",
     "default":      5.0,
     "units":        "s",

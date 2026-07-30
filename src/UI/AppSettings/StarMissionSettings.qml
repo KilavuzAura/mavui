@@ -49,7 +49,7 @@ SettingsPage {
     SettingsGroupLayout {
         Layout.fillWidth:   true
         heading:            qsTr("Drop Anchor")
-        headingDescription: qsTr("MAV_CMD_AURA_ANCHOR (31010). The vehicle locks the point it stopped at and will not move on to the next waypoint until it has held that point. Requires the aurapilot ArduSub fork.")
+        headingDescription: qsTr("MAV_CMD_AURA_ANCHOR (31010). The vehicle locks the point it stopped at and will not move on until it has held it. The camera work is part of the command: settle, turn to the heading, wait, fire, hold. Requires the aurapilot ArduSub fork.")
 
         DescribedField {
             label:       qsTr("Settle radius")
@@ -66,25 +66,25 @@ SettingsPage {
         DescribedField {
             label:       qsTr("Guard timeout (0 = auto)")
             fact:        _starMissionSettings.anchorGuard
-            description: qsTr("Hard limit on a single anchor, counted from the moment it starts. When it runs out the mission moves on whether or not the vehicle ever settled, so a bad anchor cannot stall the whole plan. 0 lets the firmware use duration x 3 + 30 s.")
+            description: qsTr("Hard limit on a single anchor, counted from the moment it starts. When it runs out the mission moves on whether or not the vehicle ever settled or finished turning, so a bad anchor cannot stall the whole plan. This matters more now that the turn and the shutter happen inside the anchor. 0 lets the firmware work one out from the duration, the pre-shutter wait and whether there is a turn.")
         }
     }
 
     SettingsGroupLayout {
         Layout.fillWidth:   true
         heading:            qsTr("Photo Timing")
-        headingDescription: qsTr("The shutter sequence at each photo target: turn to the camera heading, wait, fire, hold.")
+        headingDescription: qsTr("The shutter sequence at each photo target: turn to the camera heading, wait, fire, hold. With Anchor on the anchor command runs this sequence itself; without it the same steps are separate mission items.")
 
         DescribedField {
             label:       qsTr("Delay before shutter")
             fact:        _starMissionSettings.photoBefore
-            description: qsTr("Pause between finishing the camera turn and firing the shutter, so the vehicle has stopped swinging when the photo is taken.")
+            description: qsTr("Pause between finishing the camera turn and firing the shutter, so the vehicle has stopped swinging when the photo is taken. Capped at 31 s inside an anchor.")
         }
 
         DescribedField {
             label:       qsTr("Photo window / anchor duration")
             fact:        _starMissionSettings.photoWindow
-            description: qsTr("How long the vehicle stays at the photo point, and the anchor duration when Anchor is on. A camera turn adds 2 s on top. It has to outlast the turn plus the delay above, otherwise the firmware drops the pending queue and the shutter never fires.")
+            description: qsTr("How long the vehicle stays on the point. With Anchor on this is the plain hold after the shutter -- the anchor already sequences the turn and the shutter, so nothing has to be padded to fit. Without Anchor it is the whole window and has to outlast the turn plus the delay above, otherwise the firmware drops the pending queue and the shutter never fires.")
         }
     }
 

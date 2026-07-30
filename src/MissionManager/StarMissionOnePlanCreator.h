@@ -50,6 +50,9 @@ public:
     ///     photoWindow         hold on the photo-window waypoint (s) — the "5" item; a camera turn adds
     ///                         kTurnSeconds on top so the DO/CONDITION queue always fits inside it.
     ///                         NaN falls back to StarMissionSettings::photoWindow.
+    ///     startAnchor         drop anchor once at the start point, right after the dive in place and
+    ///                         before the first travel leg. Duration 0: the settle gate alone decides,
+    ///                         so the mission departs from a point the vehicle has actually held.
     ///
     /// The anchor tuning and the dive/surface holds are not arguments: they come from
     /// StarMissionSettings (App Settings -> Mission One) on every call.
@@ -60,7 +63,8 @@ public:
                                     double                 surfaceClearance = kDefaultSurfaceClearance,
                                     double                 bottomClearance  = kDefaultBottomClearance,
                                     double                 photoBefore      = kUseSetting,
-                                    double                 photoWindow      = kUseSetting);
+                                    double                 photoWindow      = kUseSetting,
+                                    bool                   startAnchor      = false);
 
     static constexpr double kDefaultCruiseDepth      = -1.0; ///< used when the UI leaves the depth box empty
     static constexpr double kDefaultSurfaceClearance =  0.3; ///< shallowest a cruise leg may be commanded (m below surface)

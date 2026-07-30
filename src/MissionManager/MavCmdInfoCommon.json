@@ -1248,7 +1248,7 @@
             "id":           31010,
             "rawName":      "MAV_CMD_USER_1",
             "friendlyName": "Drop anchor",
-            "description":  "Anchors the vehicle at its current point. It will not advance to the next waypoint until it has stayed inside the settle radius continuously.",
+            "description":  "Anchors the vehicle at its current point. It will not advance to the next waypoint until it has stayed inside the settle radius continuously. The camera work is part of the command: once on station it turns to the heading, waits, fires the shutter, then holds for the duration.",
             "category":     "AURA",
             "param1": {
                 "label":            "Duration",
@@ -1277,6 +1277,29 @@
                 "default":          0,
                 "decimalPlaces":    0,
                 "min":              0
+            },
+            "param5": {
+                "label":            "Camera heading",
+                "units":            "deg",
+                "default":          -1,
+                "decimalPlaces":    0,
+                "min":              -1,
+                "max":              359
+            },
+            "param6": {
+                "label":            "Take photo",
+                "enumStrings":      "No,Yes",
+                "enumValues":       "0,1",
+                "default":          0,
+                "decimalPlaces":    0
+            },
+            "param7": {
+                "label":            "Delay before shutter",
+                "units":            "secs",
+                "default":          3,
+                "decimalPlaces":    0,
+                "min":              0,
+                "max":              31
             }
         }
     ]

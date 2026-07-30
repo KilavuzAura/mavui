@@ -356,10 +356,11 @@ Item {
         var bottom      = _starMissionClearance(starMissionBottomField.text)
         var photoBefore = _starMissionWait(starMissionPhotoBeforeField.text)
         var photoWindow = _starMissionWait(starMissionPhotoWindowField.text)
+        var startAnchor = starMissionStartAnchorCheck.checked
         _exitStarMissionMode()
         if (targets.length > 0) {
             _starMissionCreator.createFullPlan(home, targets, depth, autoDepth, surface, bottom,
-                                               photoBefore, photoWindow)
+                                               photoBefore, photoWindow, startAnchor)
         }
     }
 
@@ -868,8 +869,9 @@ Item {
 
                 // Anchor + photo timing. With Anchor on, the vehicle drops anchor at
                 // the photo point: it locks the position and does not advance until it
-                // has stayed inside the settle radius continuously (requires aurapilot
-                // MAV_CMD_AURA_ANCHOR / 31010 support).
+                // has stayed inside the settle radius continuously, and the anchor
+                // command itself does the camera turn and the shutter (requires
+                // aurapilot MAV_CMD_AURA_ANCHOR / 31010 support).
                 RowLayout {
                     Layout.alignment:   Qt.AlignHCenter
                     spacing:            ScreenTools.defaultFontPixelWidth
@@ -877,6 +879,14 @@ Item {
                     QGCCheckBox {
                         id:     starMissionAnchorCheck
                         text:   qsTr("Anchor")
+                    }
+
+                    QGCCheckBox {
+                        id:     starMissionStartAnchorCheck
+                        text:   qsTr("Start anchor")
+                        // Anchors once at the start point, right after the dive in place
+                        // and before the first travel leg, so the mission departs from a
+                        // position the vehicle has actually held. No photo, no turn.
                     }
 
                     QGCLabel { text: qsTr("Foto öncesi (sn)") }
@@ -895,7 +905,9 @@ Item {
                         id:                     starMissionPhotoWindowField
                         Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 7
                         placeholderText:        _starMissionSettings.photoWindow.valueString
-                        // Duration of the photo-window waypoint (of the anchor when Anchor is on).
+                        // With Anchor on: the plain hold AFTER the shutter (the anchor
+                        // sequences the turn and the shutter itself). Without Anchor:
+                        // the whole photo window, padded to outlast the queue.
                         // Empty = the App Settings -> Mission One value.
                     }
                 }
@@ -913,6 +925,7 @@ Item {
                                                                                     surfaceText: starMissionSurfaceField.text,
                                                                                     bottomText:  starMissionBottomField.text,
                                                                                     anchorAll:   starMissionAnchorCheck.checked,
+                                                                                    startAnchor: starMissionStartAnchorCheck.checked,
                                                                                     photoBeforeText: starMissionPhotoBeforeField.text,
                                                                                     photoWindowText: starMissionPhotoWindowField.text }).open()
 
@@ -1181,6 +1194,7 @@ Item {
             property string surfaceText:    ""
             property string bottomText:     ""
             property bool   anchorAll:      false   ///< banner "Anchor" seeds every row's checkbox
+            property bool   startAnchor:    false   ///< banner "Start anchor" seeds the Home row checkbox
             property string photoBeforeText: ""     ///< CONDITION_DELAY before the shutter (s)
             property string photoWindowText: ""     ///< hold on the photo-window waypoint (s)
             property int    wpCount:    3       ///< grown by the "+ Waypoint" button
@@ -1217,7 +1231,8 @@ Item {
                                            _starMissionClearance(surfaceClearanceField.text),
                                            _starMissionClearance(bottomClearanceField.text),
                                            _starMissionWait(photoBeforeField.text),
-                                           _starMissionWait(photoWindowField.text))
+                                           _starMissionWait(photoWindowField.text),
+                                           homeAnchorCheck.checked)
             }
 
             ColumnLayout {
@@ -1240,6 +1255,10 @@ Item {
                     QGCLabel     { text: qsTr("Home"); Layout.preferredWidth: _labelWidth }
                     QGCTextField { id: homeLat; Layout.preferredWidth: _latLonWidth; text: mapCenter ? mapCenter.latitude.toFixed(7) : "" }
                     QGCTextField { id: homeLon; Layout.preferredWidth: _latLonWidth; text: mapCenter ? mapCenter.longitude.toFixed(7) : "" }
+                    // Start anchor: dropped once at the start point, after the dive in
+                    // place and before the first travel leg. It is a departure gate, not
+                    // a photo point — no camera turn and no shutter here.
+                    QGCCheckBox  { id: homeAnchorCheck; text: qsTr("Start anchor"); checked: startAnchor }
                 }
 
                 Repeater {
@@ -1264,8 +1283,9 @@ Item {
                         QGCTextField { id: yawField;  Layout.preferredWidth: _yawWidth; enabled: camCheck.checked; placeholderText: qsTr("auto") }
                         // Anchor: the vehicle drops anchor at this location — it locks the
                         // point and does not advance to the next waypoint until it has stayed
-                        // inside the settle radius continuously. Requires the aurapilot fork's
-                        // MAV_CMD_AURA_ANCHOR (31010) support.
+                        // inside the settle radius continuously, and the anchor command runs
+                        // the camera turn and the shutter itself. Requires the aurapilot
+                        // fork's MAV_CMD_AURA_ANCHOR (31010) support.
                         QGCCheckBox  { id: anchorCheck; text: qsTr("On"); checked: anchorAll }
                     }
                 }

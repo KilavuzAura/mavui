@@ -75,6 +75,9 @@ constexpr int kCmdConditionDelay    = 112;
 constexpr int kCmdConditionYaw      = 115;
 constexpr int kCmdDoDigicamControl  = 203;
 constexpr int kCmdAuraAnchor        = 31010; // MAV_CMD_USER_1 in the aurapilot ArduSub fork
+// Anchor param5 (heading, whole degrees): negative means "keep the current heading".
+// 0 is due north, so an unset slot must be -1, never 0.
+constexpr int kNoYaw                = -1;
 constexpr int kFrameGlobalRelativeAlt = 3;
 constexpr int kFrameGlobalTerrainAlt  = 10;
 constexpr int kFrameMission           = 2;
@@ -163,7 +166,8 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
                                                double                 surfaceClearance,
                                                double                 bottomClearance,
                                                double                 photoBefore,
-                                               double                 photoWindow)
+                                               double                 photoWindow,
+                                               bool                   startAnchor)
 {
     if (!home.isValid() || targets.isEmpty()) {
         return;
@@ -210,6 +214,7 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
     PatternBuilder b(cruiseDepth, autoDepth, bottomClearance);
     double prevLat = home.latitude();
     double prevLon = home.longitude();
+    bool   first   = true;
 
     for (const QVariant& targetVar : targets) {
         const QVariantMap target = targetVar.toMap();
@@ -224,38 +229,52 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
         const bool   anchor = target.value(QStringLiteral("anchor")).toBool();
 
         b.cruise(prevLat, prevLon, tuning.diveSettle);  // 1) dive in place and settle at cruise depth
+        if (first && startAnchor) {
+            // 1b) Start anchor: a departure gate, not a station. Duration 0 means the
+            //     settle gate alone decides — as soon as the vehicle has held the start
+            //     point for the settle time it leaves. Without it the first travel leg
+            //     begins from wherever the dive drifted to, and every later target
+            //     inherits that error.
+            b.command(kCmdAuraAnchor, QJsonArray({ 0, tuning.anchorRadius,
+                                                   tuning.anchorSettle, tuning.anchorGuard,
+                                                   kNoYaw, 0, 0 }));
+        }
+        first = false;
         b.cruise(lat, lon);                             // 2) travel to the target at depth
         b.waypoint(lat, lon, kSurfaceDepth, tuning.surfaceSettle);  // 3) surface and settle
 
-        if (camera) {
+        const int heading = (camera && yaw >= 0.0)
+                                ? (static_cast<int>(yaw) % 360 + 360) % 360
+                                : kNoYaw;
+
+        if (anchor) {
+            // 4) One command does the whole stop: settle on the point, turn to the
+            //    camera heading, wait out the swing, fire, then hold. Spelling that
+            //    out as CONDITION_YAW + CONDITION_DELAY + DO_DIGICAM_CONTROL beside
+            //    the anchor only worked when the queue finished inside the hold --
+            //    AP_Mission drops a pending queue the moment the nav command
+            //    completes, so a short hold silently meant no photo. Nothing has to
+            //    be padded to fit any more, so photoWindow is the plain hold after
+            //    the shutter.
+            b.command(kCmdAuraAnchor, QJsonArray({ photoWindowS, tuning.anchorRadius,
+                                                   tuning.anchorSettle, tuning.anchorGuard,
+                                                   heading, camera ? 1 : 0, photoBeforeS }));
+        } else if (camera) {
+            // No anchor: the vehicle is not held on the point, so the shutter still
+            // has to be assembled from separate items and the window padded to
+            // outlast them.
             int window = photoWindowS;
             int queue  = photoBeforeS;
-            if (yaw >= 0.0) {
-                const int deg = (static_cast<int>(yaw) % 360 + 360) % 360;
-                b.command(kCmdConditionYaw, QJsonArray({ deg, kYawRate, 0, 0, 0, 0, 0 })); // 4) turn to camera heading
+            if (heading != kNoYaw) {
+                b.command(kCmdConditionYaw, QJsonArray({ heading, kYawRate, 0, 0, 0, 0, 0 })); // 4) turn
                 window += kTurnSeconds;
                 queue  += kTurnSeconds;
             }
-            // The window must outlast the DO/CONDITION queue: AP_Mission drops the
-            // pending queue when the next nav command completes, so a short window
-            // means the shutter never fires (advance_current_nav_cmd).
             window = std::max(window, queue + 1);
 
             b.command(kCmdConditionDelay, QJsonArray({ photoBeforeS, 0, 0, 0, 0, 0, 0 })); // 5) wait
             b.command(kCmdDoDigicamControl, QJsonArray({ 0, 0, 0, 0, 1, 0, 0 }));          // 6) take photo
-            if (anchor) {
-                // 7) Anchor instead of a plain hold: the queue still runs during it,
-                //    but the mission waits until the sub has actually settled, so the
-                //    photo is taken on-station.
-                b.command(kCmdAuraAnchor, QJsonArray({ window, tuning.anchorRadius,
-                                                       tuning.anchorSettle, tuning.anchorGuard, 0, 0, 0 }));
-            } else {
-                b.waypoint(lat, lon, kSurfaceDepth, window);                               // 7) hold the photo window
-            }
-        } else if (anchor) {
-            // No photo here, but the operator still wants the sub pinned to the spot.
-            b.command(kCmdAuraAnchor, QJsonArray({ photoWindowS, tuning.anchorRadius,
-                                                   tuning.anchorSettle, tuning.anchorGuard, 0, 0, 0 }));
+            b.waypoint(lat, lon, kSurfaceDepth, window);                                   // 7) hold the window
         }
 
         prevLat = lat;
