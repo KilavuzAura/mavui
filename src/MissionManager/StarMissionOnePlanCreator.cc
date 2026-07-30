@@ -78,6 +78,10 @@ constexpr int kCmdAuraAnchor        = 31010; // MAV_CMD_USER_1 in the aurapilot 
 // Anchor param5 (heading, whole degrees): negative means "keep the current heading".
 // 0 is due north, so an unset slot must be -1, never 0.
 constexpr int kNoYaw                = -1;
+// Anchor param7 (pre-shutter wait) is a 5-bit field in the mission command, so the
+// firmware clamps anything above this. Clamp here too rather than let a value the
+// operator typed be silently cut down on the vehicle.
+constexpr int kMaxAnchorPhotoDelay  = 31;
 constexpr int kFrameGlobalRelativeAlt = 3;
 constexpr int kFrameGlobalTerrainAlt  = 10;
 constexpr int kFrameMission           = 2;
@@ -258,7 +262,8 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
             //    the shutter.
             b.command(kCmdAuraAnchor, QJsonArray({ photoWindowS, tuning.anchorRadius,
                                                    tuning.anchorSettle, tuning.anchorGuard,
-                                                   heading, camera ? 1 : 0, photoBeforeS }));
+                                                   heading, camera ? 1 : 0,
+                                                   std::min(photoBeforeS, kMaxAnchorPhotoDelay) }));
         } else if (camera) {
             // No anchor: the vehicle is not held on the point, so the shutter still
             // has to be assembled from separate items and the window padded to
