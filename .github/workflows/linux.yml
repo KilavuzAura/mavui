@@ -1,6 +1,19 @@
 name: Linux
 
 on:
+  # Elle tetikleme + release.yml'in cagirabilmesi icin.
+  workflow_dispatch:
+    inputs:
+      release_only:
+        description: 'Sadece Release derle (Debug + birim testleri atla)'
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      release_only:
+        description: 'Sadece Release derle (Debug + birim testleri atla)'
+        type: boolean
+        default: false
   push:
     branches:
       - master
@@ -29,7 +42,8 @@ jobs:
 
     strategy:
       matrix:
-        BuildType: [Debug, Release]
+        # release.yml release_only=true ile cagirinca Debug bacagi (birim testler) atlanir.
+        BuildType: ${{ fromJSON(inputs.release_only && '["Release"]' || '["Debug","Release"]') }}
         # Arch: [x64] # Arm64
 
     defaults:
@@ -37,8 +51,10 @@ jobs:
         shell: bash
 
     env:
-      ARTIFACT: QGroundControl-x86_64.AppImage
-      PACKAGE: QGroundControl-x86_64
+      # AppImage adi .desktop icindeki Name=@CMAKE_PROJECT_NAME@ alanindan gelir;
+      # custom overlay proje adini MavUI yaptigi icin dosya MavUI-x86_64.AppImage.
+      ARTIFACT: MavUI-x86_64.AppImage
+      PACKAGE: MavUI-x86_64
       QT_VERSION: 6.8.3
 
     steps:

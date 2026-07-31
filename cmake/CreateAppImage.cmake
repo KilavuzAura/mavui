@@ -35,9 +35,11 @@ endif()
 #     execute_process(COMMAND chmod a+x "${LD_GSTPLUGIN_PATH}")
 # endif()
 
+# Calistirilabilirin adi proje adindan gelir (custom overlay'de MavUI); sabit
+# QGroundControl yazilirsa markali derlemede linuxdeploy dosyayi bulamaz.
 execute_process(COMMAND ${LD_PATH}
     --appdir ${APPDIR_PATH}
-    --executable ${APPDIR_PATH}/usr/bin/QGroundControl
+    --executable ${APPDIR_PATH}/usr/bin/${CMAKE_PROJECT_NAME}
     --desktop-file ${APPDIR_PATH}/usr/share/applications/org.mavlink.qgroundcontrol.desktop
     --custom-apprun ${CMAKE_BINARY_DIR}/AppRun)
 # --exclude-library "libgst*"

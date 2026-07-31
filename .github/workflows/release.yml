@@ -1,0 +1,64 @@
+name: Release
+
+# Uc platformu tek kosuda derler ve ciktilarini tek GitHub Release'e asar.
+#
+#   v1.2.3 gibi bir tag push edilince  -> taslak Release olusur, dosyalar eklenir
+#   Actions -> Release -> Run workflow -> yalniz derler; "tag" alani doldurulursa
+#                                         o tag'e Release acar
+#
+# Dosyalar taslak (draft) Release'e dusuyor: yayinlamadan once icerigi gozden
+# gecirip "Publish release" demek gerekiyor.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release olusturulacak tag (bos birakilirsa yalniz derleme yapilir)'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  windows:
+    uses: ./.github/workflows/windows.yml
+    secrets: inherit
+
+  linux:
+    uses: ./.github/workflows/linux.yml
+    with:
+      release_only: true
+    secrets: inherit
+
+  android:
+    uses: ./.github/workflows/android-linux.yml
+    secrets: inherit
+
+  publish:
+    needs: [windows, linux, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      # Cagrilan workflow'larin artifact'leri ayni kosuya ait, buradan indirilir.
+      - name: Ciktilari topla
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Ne toplandi
+        run: ls -lR artifacts
+
+      - name: Release'e as
+        if: ${{ github.ref_type == 'tag' || inputs.tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: MavUI ${{ inputs.tag || github.ref_name }}
+          draft: true
+          generate_release_notes: true
+          files: artifacts/**/*

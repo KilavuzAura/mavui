@@ -1,6 +1,10 @@
 name: Windows
 
 on:
+  # Elle tetikleme: Actions -> Windows -> Run workflow (istenen dal secilir).
+  # MavUI'de otomatik tetik yok; Windows kosusu uzun, sürüm/deneme aninda calistirilir.
+  workflow_dispatch:
+  workflow_call:
   push:
     branches:
       - master
@@ -35,8 +39,10 @@ jobs:
         shell: cmd
 
     env:
-      ARTIFACT: QGroundControl-installer.exe
-      PACKAGE: QGroundControl-installer
+      # custom/cmake/CustomOverrides.cmake QGC_APP_NAME'i MavUI yapiyor, project()
+      # adi oradan geliyor: kurulum dosyasi <proje>-installer.exe olarak dusuyor.
+      ARTIFACT: MavUI-installer.exe
+      PACKAGE: MavUI-installer
       QT_VERSION: 6.8.3
       GST_VERSION: 1.22.12
 
@@ -125,7 +131,7 @@ jobs:
       - name: Sanity check release excecutable
         if: matrix.BuildType == 'Release'
         working-directory: ${{ runner.temp }}\shadow_build_dir\Release
-        run: QGroundControl.exe --simple-boot-test
+        run: MavUI.exe --simple-boot-test
 
       - name: Install
         working-directory: ${{ runner.temp }}\shadow_build_dir

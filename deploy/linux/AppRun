@@ -19,4 +19,4 @@ export GST_PLUGIN_PATH="${APPDIR}/usr/lib/gstreamer-1.0"
 
 # export QT_QPA_PLATFORM="wayland;xcb"
 
-exec "${APPDIR}/usr/bin/QGroundControl" "$@"
+exec "${APPDIR}/usr/bin/@CMAKE_PROJECT_NAME@" "$@"

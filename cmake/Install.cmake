@@ -59,10 +59,14 @@ elseif(LINUX)
         FILES ${CMAKE_BINARY_DIR}/metainfo/org.mavlink.qgroundcontrol.metainfo.xml
         DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo/
     )
-    install(
-        FILES ${CMAKE_SOURCE_DIR}/deploy/linux/AppRun
-        DESTINATION ${CMAKE_BINARY_DIR}
+    # AppRun ve AppImage betigi calistirilabilirin adini bilmeli; install script'i
+    # ayri bir baglamda kostugu icin proje adi acikca gecirilir (WIN32 dalindaki gibi).
+    configure_file(
+        ${CMAKE_SOURCE_DIR}/deploy/linux/AppRun
+        ${CMAKE_BINARY_DIR}/AppRun
+        @ONLY
     )
+    install(CODE "set(CMAKE_PROJECT_NAME ${CMAKE_PROJECT_NAME})")
     install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateAppImage.cmake")
 elseif(WIN32)
     install(CODE "set(CMAKE_PROJECT_NAME ${CMAKE_PROJECT_NAME})")
