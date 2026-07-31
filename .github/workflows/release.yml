@@ -45,7 +45,7 @@ jobs:
     steps:
       # Cagrilan workflow'larin artifact'leri ayni kosuya ait, buradan indirilir.
       - name: Ciktilari topla
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
