@@ -171,7 +171,9 @@ Vehicle::Vehicle(LinkInterface*             link,
     // Manual GPS position injection, see startGPSLocationInjection()
     _gpsInjectionTimer.setSingleShot(false);
     _gpsInjectionTimer.setInterval(_gpsInjectionIntervalMSecs);
+    _gpsInjectionTimer.setTimerType(Qt::PreciseTimer);   // see _gpsInjectionIntervalMSecs
     connect(&_gpsInjectionTimer, &QTimer::timeout, this, &Vehicle::_sendGPSLocationInjection);
+    connect(this, &Vehicle::armedChanged, this, &Vehicle::_stopGPSLocationInjectionOnArm);
 
     // MAV_TYPE_GENERIC is used by unit test for creating a vehicle which doesn't do the connect sequence. This
     // way we can test the methods that are used within the connect sequence.
@@ -1726,6 +1728,19 @@ void Vehicle::startGPSLocationInjection(double latitude, double longitude)
     }
 }
 
+void Vehicle::_stopGPSLocationInjectionOnArm(bool armed)
+{
+    // A fixed position is only true while the vehicle is sitting where it was typed.
+    // Once it is armed and under way, that same 5 m fix keeps telling EKF3 the vehicle
+    // has not moved, and it fights whatever is actually measuring motion (the DVL).
+    // The injection has done its job by then - the origin is set - so stop it rather
+    // than rely on the operator remembering.
+    if (armed && _gpsInjectionTimer.isActive()) {
+        stopGPSLocationInjection();
+        qgcApp()->showAppMessage(tr("Set GPS: injection stopped because the vehicle armed."));
+    }
+}
+
 void Vehicle::stopGPSLocationInjection()
 {
     if (_gpsInjectionTimer.isActive()) {
@@ -1772,9 +1787,12 @@ void Vehicle::_sendGPSLocationInjection()
         0.0f, 0.0f, 0.0f,       // vn, ve, vd (ignored above)
         0.0f,                   // speed_accuracy (ignored above)
         // Horizontal accuracy is NOT ignored: it is the one number that tells EKF3 how
-        // much to trust this, and an operator-typed position on a chart is worth about
-        // a few metres. Claiming better would let it fight the DVL.
-        5.0f,                   // horiz_accuracy (m)
+        // much to trust this, and an operator-typed position on a chart is worth a few
+        // metres. Not 5.0 though - EKF3 rejects on hAcc > 5.0 * EK3_CHECK_SCALE/100
+        // (AP_NavEKF3_VehicleStatus.cpp:123), so 5.0 passes only because the test is
+        // strictly greater. Any vehicle with EK3_CHECK_SCALE below 100 fails prearm
+        // with "GPS horiz error" and the button still reads "Stop GPS".
+        3.0f,                   // horiz_accuracy (m)
         0.0f,                   // vert_accuracy (ignored above)
         10,                     // satellites_visible - enough to pass the arming check
         0);                     // yaw, 0 = not available

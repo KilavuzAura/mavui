@@ -116,7 +116,9 @@ Rectangle {
         anchors.rightMargin:    ScreenTools.defaultFontPixelWidth
         anchors.verticalCenter: parent.verticalCenter
         spacing:                ScreenTools.defaultFontPixelWidth / 2
-        visible:                _activeVehicle && !_communicationLost
+        // Stays up while injecting even if telemetry drops: hiding the row took Stop
+        // away exactly when the operator most needs it, while the timer kept running.
+        visible:                _activeVehicle && (!_communicationLost || _injecting)
 
         property bool _injecting: _activeVehicle ? _activeVehicle.gpsLocationInjectionActive : false
 

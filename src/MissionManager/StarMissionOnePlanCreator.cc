@@ -341,6 +341,20 @@ namespace {
 // (-0.3 m by default) and terrain-frame cruise legs carry a positive clearance. The
 // window is wide enough to also take plans written with -0.09 by hand or by an older
 // generator.
+// The anchor's x/y carry a heading and a shutter flag, not a coordinate - but only a
+// plan read back from a .plan file says so. A plan downloaded from the vehicle arrives
+// with frame 0: ArduPilot stamps a frame only on the commands stored_in_location()
+// lists (AP_Mission.cpp:1556 leaves packet.frame = 0 otherwise) and the anchor is not
+// one of them. QGC then treats x/y of anything that is not MAV_FRAME_MISSION as a
+// scaled coordinate and divides by 1e7 (PlanManager.cc:406), so a 90 deg heading
+// arrives as 9e-06. Read as degrees that is 0 - due north - which is a heading the
+// vehicle really would slew to, at every stop, with nothing on screen to say so.
+// Scale it back so both sources give the same answer.
+double anchorField(SimpleMissionItem* item, double param)
+{
+    return item->missionItem().frame() == MAV_FRAME_MISSION ? param : param * 1e7;
+}
+
 bool isSurfaceWaypoint(SimpleMissionItem* item)
 {
     if (item->command() != kCmdNavWaypoint) {
@@ -394,8 +408,9 @@ QVariantList StarMissionOnePlanCreator::extractTargets() const
                 // param5 heading (negative = no turn), param6 shutter - the same
                 // convention mavlink_int_to_mission_cmd() reads on the vehicle.
                 anchor = true;
-                yaw    = it->missionItem().param5() >= 0.0 ? it->missionItem().param5() : double(kNoYaw);
-                camera = !qFuzzyIsNull(it->missionItem().param6());
+                const double heading = anchorField(it, it->missionItem().param5());
+                yaw    = heading >= 0.0 ? heading : double(kNoYaw);
+                camera = !qFuzzyIsNull(anchorField(it, it->missionItem().param6()));
                 i = j;
                 break;
             }

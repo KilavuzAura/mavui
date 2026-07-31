@@ -337,16 +337,31 @@ Item {
     // this the table seeded Home from the map centre and threw the placement away.
     function _starMissionPlacedTargets() {
         var targets = []
+        var unusedSeed = _starMissionSeed.slice()   // her tohum en fazla bir hedefe gider
         for (var i = 1; i < _visualItems.count; i++) {
             var it = _visualItems.get(i)
             if (!it.specifiesCoordinate) {
                 continue
             }
-            // A map item cannot carry a camera heading or an anchor flag. For targets
-            // recovered from an existing plan those come back from _starMissionSeed by
-            // index; anything clicked afterwards falls back to no heading and the
-            // banner's Anchor box.
-            var seed = targets.length < _starMissionSeed.length ? _starMissionSeed[targets.length] : null
+            // A map item cannot carry a camera heading or an anchor flag, so for targets
+            // recovered from an existing plan those come back from _starMissionSeed -
+            // matched by POSITION, not by order. Order matching silently pinned the
+            // wrong heading onto the wrong target as soon as anything shifted the
+            // indices: deleting a target from the mission item list on the right, or
+            // Undo followed by a fresh map click, handed a new target the heading and
+            // anchor flag of the one that was removed. Each seed is consumed once, so
+            // two targets on the same spot cannot both claim it.
+            // Dragging a recovered target off its position drops its heading, which the
+            // Table shows as an empty Yaw box - visible and recoverable, unlike the
+            // wrong heading it used to inherit.
+            var seed = null
+            for (var s = 0; s < unusedSeed.length; s++) {
+                if (unusedSeed[s].coordinate.distanceTo(it.coordinate) < 0.5) {
+                    seed = unusedSeed[s]
+                    unusedSeed.splice(s, 1)
+                    break
+                }
+            }
             targets.push({ coordinate: it.coordinate,
                            camera:     it.cameraSection ? (it.cameraSection.cameraAction.rawValue === 6) : false,
                            yaw:        seed ? seed.yaw : -1,

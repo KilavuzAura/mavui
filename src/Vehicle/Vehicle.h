@@ -939,6 +939,7 @@ signals:
 
 private slots:
     void _sendGPSLocationInjection();
+    void _stopGPSLocationInjectionOnArm(bool armed);
     void _mavlinkMessageReceived            (LinkInterface* link, mavlink_message_t message);
     void _sendMessageMultipleNext           ();
     void _parametersReady                   (bool parametersReady);
@@ -1226,11 +1227,15 @@ private:
     QList<MavCommandListEntry_t>    _mavCommandList;
     QTimer                          _mavCommandResponseCheckTimer;
 
-    // Manual GPS position injection (startGPSLocationInjection). Streamed at 5 Hz
-    // because AP_GPS drops the fix 4 s after the last GPS_INPUT.
+    // Manual GPS position injection (startGPSLocationInjection). Streamed because
+    // AP_GPS drops the fix 4 s after the last GPS_INPUT. 10 Hz rather than the 5 Hz
+    // the fix rate alone would need: AP_GPS::is_healthy() also requires the average
+    // inter-message gap to stay under 215 ms (AP_GPS.cpp:2162), and a 200 ms period
+    // on Qt's default coarse timer has almost no margin against that - one busy
+    // moment in the GUI thread and the vehicle reports an unhealthy GPS instead.
     QTimer                          _gpsInjectionTimer;
     QGeoCoordinate                  _gpsInjectionCoord;
-    static constexpr int            _gpsInjectionIntervalMSecs = 200;
+    static constexpr int            _gpsInjectionIntervalMSecs = 100;
     static const int                _mavCommandMaxRetryCount                = 3;
     static const int                _mavCommandResponseCheckTimeoutMSecs    = 500;
     static const int                _mavCommandAckTimeoutMSecs              = 3000;
