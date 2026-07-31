@@ -41,7 +41,13 @@ namespace {
 // the camera on top clears the water. Matches aura_foto_plan_uret.py /
 // gorev_yukle.py (SATIH_DERINLIK).
 constexpr double kSurfaceDepth  = -0.1; // surface waypoint depth (m, negative)
-constexpr int    kTurnSeconds   = 2;    // fixed budget for the camera turn
+constexpr int    kTurnSeconds   = 2;    // nominal padding added to both window and queue
+// Worst-case camera turn, used only on the unanchored path to size the photo window.
+// Not a nominal figure: it has to cover the slowest turn the vehicle can make, because
+// the window running out silently kills the shutter. The firmware's own anchor guard
+// allows 30 s for a turn; 20 s covers every turn measured on the vehicle with room to
+// spare (131 deg reached the +-2 deg window in 3.8 s, and settled continuously by 16 s).
+constexpr int    kTurnBudgetSeconds = 20;
 constexpr int    kYawRate       = 90;   // camera yaw rate (deg/s)
 
 // The dive/surface holds and the "drop anchor" (MAV_CMD_AURA_ANCHOR) tuning are
@@ -193,6 +199,14 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
     if (!std::isfinite(surfaceClearance) || surfaceClearance <= 0.0) {
         surfaceClearance = kDefaultSurfaceClearance;
     }
+    // Bounded in both directions, because this box ends up setting the cruise depth
+    // (see the clamp further down) and the UI applies no validator.
+    //   Too small: a clearance of 0.1 pulls the cruise legs to -0.1 m, the same depth
+    //   as the surface waypoints. The pattern collapses - the vehicle travels at the
+    //   surface - and extractTargets() then reads every cruise leg back as a target,
+    //   because a surface waypoint is recognised by its depth.
+    //   Too large: someone typing 30 (thinking centimetres) sends the vehicle to 30 m.
+    surfaceClearance = std::clamp(surfaceClearance, kMinSurfaceClearance, kMaxSurfaceClearance);
     if (!std::isfinite(bottomClearance) || bottomClearance <= 0.0) {
         bottomClearance = kDefaultBottomClearance;
     }
@@ -280,6 +294,21 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
                 queue  += kTurnSeconds;
             }
             window = std::max(window, queue + 1);
+            // kTurnSeconds is a fiction and the padding above is not enough on its own.
+            // The rate in the CONDITION_YAW item never reaches the controller: ArduSub
+            // clamps it to AUTO_YAW_SLEW_RATE (60 deg/s) and then only reads that value
+            // in GUIDED - in AUTO the turn runs at ATC_SLEW_YAW and the body lags well
+            // behind it. verify_yaw() closes on measured heading (+-2 deg), not on a
+            // duration. Measured on the vehicle (30 Jul log_266): a 64 deg turn first
+            // touched the window at 2.5 s, a 131 deg turn at 3.8 s - against a 4.0 s
+            // budget. That is a 0.2 s margin, and past ~140 deg it goes negative: the
+            // nav command finishes first, advance_current_nav_cmd drops the pending
+            // queue and the shutter never fires, with nothing in the log to say so
+            // (29 Jul: 6 CondYaw, 0 DigiCamCtrl). The firmware's own auto guard budgets
+            // 30 s for a turn; match that order of magnitude rather than 2 s.
+            if (heading != kNoYaw) {
+                window = std::max(window, photoBeforeS + kTurnBudgetSeconds + 1);
+            }
 
             b.command(kCmdConditionDelay, QJsonArray({ photoBeforeS, 0, 0, 0, 0, 0, 0 })); // 5) wait
             b.command(kCmdDoDigicamControl, QJsonArray({ 0, 0, 0, 0, 1, 0, 0 }));          // 6) take photo

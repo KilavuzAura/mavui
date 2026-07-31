@@ -296,9 +296,11 @@ Item {
     // points. Their heading and anchor flag cannot live on a map item, so they stay in
     // _starMissionSeed and are re-attached by index in _starMissionPlacedTargets().
     function _starMissionRestore(start, targets) {
-        if (targets.length === 0) {
-            return
-        }
+        // The start point is restored even when no targets could be read back. Bailing
+        // out first left _starMissionHomeSet false while the first inserted item made
+        // MissionController place a home 30 m north of it, so the map showed a start
+        // marker, the banner still said "click to set the start point", and Finish
+        // silently did nothing at all.
         var settingsItem = _visualItems.get(0)
         if (settingsItem && start && start.isValid) {
             settingsItem.coordinate = start

@@ -1253,16 +1253,18 @@
             "param1": {
                 "label":            "Duration",
                 "units":            "secs",
-                "default":          20,
+                "default":          5,
                 "decimalPlaces":    0,
-                "min":              0
+                "min":              0,
+                "max":              600
             },
             "param2": {
                 "label":            "Settle radius",
                 "units":            "m",
-                "default":          0.3,
+                "default":          1.0,
                 "decimalPlaces":    2,
-                "min":              0
+                "min":              0,
+                "max":              100
             },
             "param3": {
                 "label":            "Settle time",

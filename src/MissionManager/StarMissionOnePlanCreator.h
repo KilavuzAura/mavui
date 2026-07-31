@@ -78,6 +78,12 @@ public:
 
     static constexpr double kDefaultCruiseDepth      = -1.0; ///< used when the UI leaves the depth box empty
     static constexpr double kDefaultSurfaceClearance =  0.3; ///< shallowest a cruise leg may be commanded (m below surface)
+    /// Bounds on the surface-clearance box. Below kMin the cruise legs collide with the
+    /// surface waypoints (-0.1 m) and the dive/surface pattern stops existing; above
+    /// kMax an operator who typed centimetres would send the vehicle far deeper than
+    /// intended. Neither end is validated in the UI, so it is enforced here.
+    static constexpr double kMinSurfaceClearance     =  0.3;
+    static constexpr double kMaxSurfaceClearance     =  5.0;
     static constexpr double kDefaultBottomClearance  =  1.0; ///< terrain-frame cruise altitude above the floor (m)
     /// Sentinel for "take this from StarMissionSettings" — the non-finite check in
     /// createFullPlan() already routes blank UI boxes down the same path.
