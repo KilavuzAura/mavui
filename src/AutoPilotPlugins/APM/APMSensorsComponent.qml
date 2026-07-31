@@ -437,10 +437,11 @@ SetupPage {
                                     lat = _gcsPosition.latitude
                                     lon = _gcsPosition.longitude
                                 }
-                                if (isNaN(lat) || isNaN(lon)) {
+                                var yaw = parseFloat(northCalYaw.text)
+                                if (isNaN(lat) || isNaN(lon) || isNaN(yaw)) {
                                     return
                                 }
-                                controller.calibrateCompassNorth(lat, lon, compassMask())
+                                controller.calibrateCompassNorth(lat, lon, yaw, compassMask())
                             }
                         }
                     }
@@ -587,6 +588,29 @@ SetupPage {
                                 enabled:    !useGcsPositionCheckbox.checked
                             }
 
+                            // Fast calibration solves for the offsets that make the measured
+                            // field match the world magnetic model at this position AND this
+                            // heading. The heading is not measured - it is asserted, and every
+                            // degree it is wrong by lands in the compass as a permanent yaw
+                            // bias. QGC hard-codes 0 (north), which means the vehicle has to be
+                            // physically pointing true north. That is fine on a bench and close
+                            // to impossible for a sub in the water on a tether, so the heading
+                            // is editable here: line the vehicle up on any bearing you actually
+                            // know - a dock edge, a stretched rope, a bearing taken on the
+                            // surface - and type that instead.
+                            QGCLabel {
+                                width:      parent.width
+                                visible:    northCalibrationCheckBox.checked
+                                wrapMode:   Text.WordWrap
+                                text:       qsTr("Vehicle heading (deg true). The vehicle must actually be pointing this way - the calibration trusts it without checking.")
+                            }
+
+                            FactTextField {
+                                id:         northCalYaw
+                                visible:    northCalibrationCheckBox.checked
+                                text:       "0"
+                                textColor:  isNaN(parseFloat(text)) ? qgcPal.warningText : qgcPal.textFieldText
+                            }
                         }
                     }
                 }

@@ -262,11 +262,17 @@ void APMSensorsComponentController::calibrateCompass()
     // Now we wait for the result to come back
 }
 
-void APMSensorsComponentController::calibrateCompassNorth(float lat, float lon, int mask)
+void APMSensorsComponentController::calibrateCompassNorth(float lat, float lon, float yawDeg, int mask)
 {
     _startLogCalibration();
     (void) connect(_vehicle, &Vehicle::mavCommandResult, this, &APMSensorsComponentController::_mavCommandResult);
-    _vehicle->sendMavCommand(_vehicle->defaultComponentId(), MAV_CMD_FIXED_MAG_CAL_YAW, true /* showError */, 0 /* north*/, mask, lat, lon);
+    // param1 is the heading the vehicle is asserted to be on. It used to be hard-coded
+    // to 0, which silently required the vehicle to be pointing true north: the firmware
+    // does not measure the heading, it builds the expected field from it
+    // (AP_Compass_Calibration.cpp mag_cal_fixed_yaw), so any error becomes a permanent
+    // yaw bias. A sub in the water cannot be held on north, so the operator states the
+    // bearing it is actually lined up on.
+    _vehicle->sendMavCommand(_vehicle->defaultComponentId(), MAV_CMD_FIXED_MAG_CAL_YAW, true /* showError */, yawDeg, mask, lat, lon);
 }
 
 void APMSensorsComponentController::calibrateAccel(bool doSimpleAccelCal)
