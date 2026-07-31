@@ -92,7 +92,7 @@ Rectangle {
         anchors.bottomMargin:   1
         anchors.top:            parent.top
         anchors.bottom:         parent.bottom
-        anchors.right:          setGPSRow.left
+        anchors.right:          parent.right
         contentWidth:           toolIndicators.width
         flickableDirection:     Flickable.HorizontalFlick
 
@@ -100,71 +100,9 @@ Rectangle {
     }
 
     //-------------------------------------------------------------------------
-    //-- Manual GPS position, the job SonarView's "Pick Location" does. The vehicle
-    //   carries no GPS, so the operator types where it actually is and the autopilot
-    //   is fed that as a fix (GPS_INPUT); the EKF origin, home and the map all follow
-    //   from the fix rather than being poked individually.
-    //
-    //   It is a stream, not a one-shot: AP_GPS drops the fix 4 s after the last
-    //   message (GPS_TIMEOUT_MS) and EKF3 wants a run of consistent samples before it
-    //   trusts GPS at all, so the button toggles injection rather than firing once.
-    //   Needs GPS_TYPE = 14 (MAV) on the vehicle - at 0 the messages are dropped
-    //   silently, which is why the button reports what it started.
-    RowLayout {
-        id:                     setGPSRow
-        anchors.right:          parent.right
-        anchors.rightMargin:    ScreenTools.defaultFontPixelWidth
-        anchors.verticalCenter: parent.verticalCenter
-        spacing:                ScreenTools.defaultFontPixelWidth / 2
-        // Stays up while injecting even if telemetry drops: hiding the row took Stop
-        // away exactly when the operator most needs it, while the timer kept running.
-        visible:                _activeVehicle && (!_communicationLost || _injecting)
-
-        property bool _injecting: _activeVehicle ? _activeVehicle.gpsLocationInjectionActive : false
-
-        QGCLabel { text: qsTr("Lat") }
-
-        QGCTextField {
-            id:                     setGPSLat
-            Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 11
-            placeholderText:        qsTr("40.7493297")
-            enabled:                !setGPSRow._injecting
-        }
-
-        QGCLabel { text: qsTr("Lon") }
-
-        QGCTextField {
-            id:                     setGPSLon
-            Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 11
-            placeholderText:        qsTr("29.8250267")
-            enabled:                !setGPSRow._injecting
-        }
-
-        QGCButton {
-            text:       setGPSRow._injecting ? qsTr("Stop GPS") : qsTr("Set GPS")
-            primary:    setGPSRow._injecting
-
-            onClicked: {
-                if (setGPSRow._injecting) {
-                    _activeVehicle.stopGPSLocationInjection()
-                    return
-                }
-                var lat = parseFloat(setGPSLat.text)
-                var lon = parseFloat(setGPSLon.text)
-                if (isNaN(lat) || isNaN(lon)) {
-                    mainWindow.showMessageDialog(qsTr("Set GPS"),
-                                                 qsTr("Enter a latitude and a longitude in decimal degrees."))
-                    return
-                }
-                _activeVehicle.startGPSLocationInjection(lat, lon)
-            }
-        }
-    }
-
-    //-------------------------------------------------------------------------
     //-- Branding Logo
     Image {
-        anchors.right:          setGPSRow.left
+        anchors.right:          parent.right
         anchors.top:            parent.top
         anchors.bottom:         parent.bottom
         anchors.margins:        ScreenTools.defaultFontPixelHeight * 0.66
