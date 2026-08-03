@@ -27,13 +27,14 @@ Rectangle {
     height:     mainLayout.height + (_margins * 2)
     color:      Qt.rgba(qgcPal.window.r, qgcPal.window.g, qgcPal.window.b, 0.5)
     radius:     _margins
-    visible:    _camera.capturesVideo || _camera.capturesPhotos || _camera.hasTracking || _camera.hasVideoStream
+    visible:    _camera.capturesVideo || _camera.capturesPhotos || _camera.hasTracking || _camera.hasVideoStream || _streamRecordAvailable
 
     property real   _margins:                   ScreenTools.defaultFontPixelHeight / 2
     property real   _smallMargins:              ScreenTools.defaultFontPixelWidth / 2
     property var    _activeVehicle:             globals.activeVehicle
     property var    _cameraManager:             _activeVehicle.cameraManager
     property var    _camera:                    _cameraManager.currentCameraInstance
+    property var    _videoManager:              QGroundControl.videoManager
     property bool   _cameraInPhotoMode:         _camera.cameraMode === MavlinkCameraControl.CAM_MODE_PHOTO
     property bool   _cameraInVideoMode:         !_cameraInPhotoMode
     property bool   _videoCaptureIdle:          _camera.videoCaptureStatus === MavlinkCameraControl.VIDEO_CAPTURE_STATUS_STOPPED
@@ -41,9 +42,31 @@ Rectangle {
     property bool   _photoCaptureIntervalIdle:  _camera.photoCaptureStatus === MavlinkCameraControl.PHOTO_CAPTURE_INTERVAL_IDLE
     property bool   _photoCaptureIdle:          _photoCaptureSingleIdle || _photoCaptureIntervalIdle
 
+    // A vehicle camera can advertise photo capture only. ArduPilot does exactly that when CAM1_TYPE is set to
+    // MAVLink: it announces itself as a photo-only camera, which leaves no way to record the incoming stream.
+    // Recording the stream to disk is a ground station job anyway, so it gets its own control in that case.
+    property bool   _streamRecordAvailable:     _videoManager.hasVideo && _camera && !_camera.capturesVideo
+    property bool   _streamRecording:           _videoManager.recording
+    property string _streamRecordTimeStr:       _secondsToTimeStr(0)
+    property double _streamRecordStartMSecs:    0
+
     QGCPalette { id: qgcPal; colorGroupEnabled: enabled }
 
     DeadMouseArea { anchors.fill: parent }
+
+    Timer {
+        interval:           1000
+        repeat:             true
+        running:            _streamRecording
+        onRunningChanged:   if (running) { _streamRecordStartMSecs = Date.now(); _streamRecordTimeStr = _secondsToTimeStr(0) }
+        onTriggered:        _streamRecordTimeStr = _secondsToTimeStr(Math.floor((Date.now() - _streamRecordStartMSecs) / 1000))
+    }
+
+    function _secondsToTimeStr(seconds) {
+        var hours   = Math.floor(seconds / 3600)
+        var minutes = Math.floor((seconds % 3600) / 60)
+        return ('0' + hours).slice(-2) + ':' + ('0' + minutes).slice(-2) + ':' + ('0' + (seconds % 60)).slice(-2)
+    }
 
     RowLayout {
         id:                 mainLayout
@@ -234,6 +257,46 @@ Rectangle {
                         text:               _activeVehicle ? ('00000' + _activeVehicle.cameraTriggerPoints.count).slice(-5) : "00000"
                         font.pointSize:     ScreenTools.largeFontPointSize
                         visible:            _cameraInPhotoMode
+                    }
+                }
+
+                // Start/Stop recording the incoming video stream to disk. Only shown when the camera itself
+                // can't record, otherwise the button above already does it.
+                ColumnLayout {
+                    Layout.alignment:   Qt.AlignHCenter
+                    spacing:            _margins
+                    visible:            _streamRecordAvailable
+
+                    Rectangle {
+                        Layout.alignment:   Qt.AlignHCenter
+                        color:              Qt.rgba(0,0,0,0)
+                        width:              ScreenTools.defaultFontPixelWidth * 6
+                        height:             width
+                        radius:             width * 0.5
+                        border.color:       qgcPal.buttonText
+                        border.width:       3
+
+                        Rectangle {
+                            anchors {
+                                centerIn:           parent
+                                alignWhenCentered:  false
+                            }
+                            width:              parent.width * (_streamRecording ? 0.5 : 0.75)
+                            height:             width
+                            radius:             _streamRecording ? 0 : width * 0.5
+                            color:              qgcPal.colorRed
+                        }
+
+                        MouseArea {
+                            anchors.fill:   parent
+                            onClicked:      _streamRecording ? _videoManager.stopRecording() : _videoManager.startRecording()
+                        }
+                    }
+
+                    QGCLabel {
+                        Layout.alignment:   Qt.AlignHCenter
+                        text:               _streamRecording ? _streamRecordTimeStr : qsTr("Record Stream")
+                        font.pointSize:     ScreenTools.defaultFontPointSize
                     }
                 }
 
