@@ -399,7 +399,7 @@ void APMFirmwarePlugin::_adjustCalibrationMessageSeverity(mavlink_message_t *mes
     );
 }
 
-void APMFirmwarePlugin::initializeStreamRates(Vehicle *vehicle)
+APMFirmwarePluginInstanceData *APMFirmwarePlugin::_ensureInstanceData(Vehicle *vehicle)
 {
     // We use loss of BATTERY_STATUS/HOME_POSITION as a trigger to reinitialize stream rates
     auto instanceData = qobject_cast<APMFirmwarePluginInstanceData*>(vehicle->firmwarePluginInstanceData());
@@ -408,6 +408,13 @@ void APMFirmwarePlugin::initializeStreamRates(Vehicle *vehicle)
         instanceData->lastBatteryStatusTime = instanceData->lastHomePositionTime = QTime::currentTime();
         vehicle->setFirmwarePluginInstanceData(instanceData);
     }
+
+    return instanceData;
+}
+
+void APMFirmwarePlugin::initializeStreamRates(Vehicle *vehicle)
+{
+    auto instanceData = _ensureInstanceData(vehicle);
 
     if (SettingsManager::instance()->mavlinkSettings()->apmStartMavlinkStreams()->rawValue().toBool()) {
 
@@ -455,6 +462,9 @@ void APMFirmwarePlugin::initializeStreamRates(Vehicle *vehicle)
 
 void APMFirmwarePlugin::initializeVehicle(Vehicle *vehicle)
 {
+    // Not left to initializeStreamRates: vehicle type overrides of it (ArduSub) don't create the instance data.
+    _ensureInstanceData(vehicle);
+
     if (vehicle->isOfflineEditingVehicle()) {
         switch (vehicle->vehicleType()) {
         case MAV_TYPE_QUADROTOR:

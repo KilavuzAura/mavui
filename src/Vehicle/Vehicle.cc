@@ -2493,10 +2493,14 @@ static void _sendMavCommandWithLambdaFallbackHandler(void* resultHandlerData, in
 
     switch (ack.result) {
     case MAV_RESULT_ACCEPTED:
-        instanceData->setCommandSupported(MAV_CMD(ack.command), FirmwarePluginInstanceData::CommandSupportedResult::SUPPORTED);
+        if (instanceData) {
+            instanceData->setCommandSupported(MAV_CMD(ack.command), FirmwarePluginInstanceData::CommandSupportedResult::SUPPORTED);
+        }
         break;
     case MAV_RESULT_UNSUPPORTED:
-        instanceData->setCommandSupported(MAV_CMD(ack.command), FirmwarePluginInstanceData::CommandSupportedResult::UNSUPPORTED);
+        if (instanceData) {
+            instanceData->setCommandSupported(MAV_CMD(ack.command), FirmwarePluginInstanceData::CommandSupportedResult::UNSUPPORTED);
+        }
         // call the "unsupported" lambda:
         data->unsupported_lambda();
         break;
@@ -2515,7 +2519,12 @@ void Vehicle::sendMavCommandWithLambdaFallback(std::function<void()> lambda, int
 
     auto* instanceData = firmwarePluginInstanceData();
 
-    switch (instanceData->getCommandSupported(command)) {
+    // A firmware plugin which never created its instance data leaves this null. Without the instance data we
+    // can't know whether the command is supported, so take the UNKNOWN path: send it and let the ack decide.
+    const FirmwarePluginInstanceData::CommandSupportedResult commandSupported =
+        instanceData ? instanceData->getCommandSupported(command) : FirmwarePluginInstanceData::CommandSupportedResult::UNKNOWN;
+
+    switch (commandSupported) {
     case FirmwarePluginInstanceData::CommandSupportedResult::UNSUPPORTED:
         // command is defintely unsupported, so call the lambda function:
         lambda();

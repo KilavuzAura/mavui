@@ -19,6 +19,8 @@
 
 Q_DECLARE_LOGGING_CATEGORY(APMFirmwarePluginLog)
 
+class APMFirmwarePluginInstanceData;
+
 struct APMCustomMode
 {
     enum Mode : uint32_t {
@@ -62,6 +64,9 @@ public:
     void adjustOutgoingMavlinkMessageThreadSafe(Vehicle *vehicle, LinkInterface *outgoingLink, mavlink_message_t *message) override;
     virtual void initializeStreamRates(Vehicle *vehicle);
     void initializeVehicle(Vehicle *vehicle) override;
+    /// Creates the APMFirmwarePluginInstanceData for the vehicle if it doesn't have one yet.
+    /// Must run for every APM vehicle: Vehicle::sendMavCommandWithLambdaFallback dereferences the instance data.
+    APMFirmwarePluginInstanceData *_ensureInstanceData(Vehicle *vehicle);
     bool sendHomePositionToVehicle() const override { return true; }
     QString missionCommandOverrides(QGCMAVLink::VehicleClass_t vehicleClass) const override;
     QString _internalParameterMetaDataFile(const Vehicle* vehicle) const override;
