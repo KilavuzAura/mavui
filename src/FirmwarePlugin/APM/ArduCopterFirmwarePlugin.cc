@@ -102,7 +102,19 @@ ArduCopterFirmwarePlugin::ArduCopterFirmwarePlugin(QObject *parent)
         FirmwarePlugin::remapParamNameMap_t &remapV4_0 = _remapParamName[4][0];
 
         remapV4_0["TUNE_MIN"] = QStringLiteral("TUNE_HIGH");
-        remapV3_7["TUNE_MAX"] = QStringLiteral("TUNE_LOW");
+        remapV4_0["TUNE_MAX"] = QStringLiteral("TUNE_LOW");
+
+        FirmwarePlugin::remapParamNameMap_t &remapV4_7 = _remapParamName[4][7];
+
+        // 4.7 turned ARMING_CHECK into ARMING_SKIPCHK and inverted its meaning: the bitmask now lists
+        // the checks to SKIP (0 = nothing skipped) and no longer has the bit 0 "All" entry.
+        remapV4_7["ARMING_SKIPCHK"] = QStringLiteral("ARMING_CHECK");
+
+        remapV4_7["PSC_D_ACC_P"] = QStringLiteral("PSC_ACCZ_P");
+        remapV4_7["PSC_D_ACC_I"] = QStringLiteral("PSC_ACCZ_I");
+
+        // WP_SPD is m/s where WPNAV_SPEED was cm/s.
+        remapV4_7["WP_SPD"] = QStringLiteral("WPNAV_SPEED");
 
         _remapParamNameIntialized = true;
     }
@@ -111,11 +123,6 @@ ArduCopterFirmwarePlugin::ArduCopterFirmwarePlugin(QObject *parent)
 ArduCopterFirmwarePlugin::~ArduCopterFirmwarePlugin()
 {
 
-}
-
-int ArduCopterFirmwarePlugin::remapParamNameHigestMinorVersionNumber(int majorVersionNumber) const
-{
-    return ((majorVersionNumber == 3) ? 7 : Vehicle::versionNotSetValue);
 }
 
 bool ArduCopterFirmwarePlugin::multiRotorXConfig(Vehicle *vehicle) const

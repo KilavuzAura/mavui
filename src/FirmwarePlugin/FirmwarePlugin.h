@@ -316,9 +316,6 @@ public:
     /// Returns the mapping structure which is used to map from one parameter name to another based on firmware version.
     virtual const remapParamNameMajorVersionMap_t &paramNameRemapMajorVersionMap() const;
 
-    /// Returns the highest major version number that is known to the remap for this specified major version.
-    virtual int remapParamNameHigestMinorVersionNumber(int majorVersionNumber) const { return 0; }
-
     /// @return true: Motors are coaxial like an X8 config, false: Quadcopter for example
     virtual bool multiRotorCoaxialMotors(Vehicle* /*vehicle*/) const { return false; }
 

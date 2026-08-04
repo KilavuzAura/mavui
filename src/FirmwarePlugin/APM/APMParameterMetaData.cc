@@ -405,6 +405,9 @@ bool APMParameterMetaData::_parseParameterAttributes(QXmlStreamReader &xml, APMF
                     rawMetaData->rebootRequired = true;
                 }
             }
+        } else if ((elementName == "bitmask") || (elementName == "bit")) {
+            // Structured form of the Bitmask field, emitted alongside it since ArduPilot 4.6. The flat
+            // "Bitmask" field above is parsed instead, so these are skipped rather than warned about.
         } else if (elementName == "values") {
             // doing nothing individual value will follow anyway. May be used for sanity checking.
         } else if (elementName == "value") {

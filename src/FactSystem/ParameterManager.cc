@@ -1181,20 +1181,36 @@ QString ParameterManager::_remapParamNameToVersion(const QString &paramName) con
     }
 
     const FirmwarePlugin::remapParamNameMajorVersionMap_t &majorVersionRemap = _vehicle->firmwarePlugin()->paramNameRemapMajorVersionMap();
-    if (!majorVersionRemap.contains(majorVersion)) {
-        // No mapping for this major version
-        qCDebug(ParameterManagerLog) << "_remapParamNameToVersion: no major version mapping";
-        return mappedParamName;
-    }
 
-    const FirmwarePlugin::remapParamNameMinorVersionRemapMap_t &remapMinorVersion = majorVersionRemap[majorVersion];
-    // We must map backwards from the highest known minor version to one above the vehicle's minor version
-    for (int currentMinorVersion = _vehicle->firmwarePlugin()->remapParamNameHigestMinorVersionNumber(majorVersion); currentMinorVersion>minorVersion; currentMinorVersion--) {
-        if (remapMinorVersion.contains(currentMinorVersion)) {
-            const FirmwarePlugin::remapParamNameMap_t &remap = remapMinorVersion[currentMinorVersion];
+    // Code always uses the newest known name for a parameter. Walk every rename which happened after
+    // the vehicle's firmware version, newest first, mapping the name backwards one release at a time.
+    // The walk has to cross major versions too: a parameter renamed by 4.7 may have been renamed by 3.6
+    // before that, and both hops are needed to reach the name a 3.5 vehicle actually has.
+    for (auto majorIt = majorVersionRemap.constEnd(); majorIt != majorVersionRemap.constBegin(); ) {
+        --majorIt;
+
+        const int currentMajorVersion = majorIt.key();
+        if (currentMajorVersion < majorVersion) {
+            break;
+        }
+
+        // Every rename from a newer major version applies. Within the vehicle's own major version only
+        // the renames introduced after its minor version do.
+        const int oldestMinorVersionToApply = (currentMajorVersion == majorVersion) ? (minorVersion + 1) : 0;
+
+        const FirmwarePlugin::remapParamNameMinorVersionRemapMap_t &remapMinorVersion = majorIt.value();
+        for (auto minorIt = remapMinorVersion.constEnd(); minorIt != remapMinorVersion.constBegin(); ) {
+            --minorIt;
+
+            const int currentMinorVersion = minorIt.key();
+            if (currentMinorVersion < oldestMinorVersionToApply) {
+                break;
+            }
+
+            const FirmwarePlugin::remapParamNameMap_t &remap = minorIt.value();
             if (remap.contains(mappedParamName)) {
                 const QString toParamName = remap[mappedParamName];
-                qCDebug(ParameterManagerLog) << "_remapParamNameToVersion: remapped currentMinor:from:to" << currentMinorVersion << mappedParamName << toParamName;
+                qCDebug(ParameterManagerLog) << "_remapParamNameToVersion: remapped major:minor:from:to" << currentMajorVersion << currentMinorVersion << mappedParamName << toParamName;
                 mappedParamName = toParamName;
             }
         }

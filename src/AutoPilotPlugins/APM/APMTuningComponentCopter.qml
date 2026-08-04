@@ -38,8 +38,8 @@ SetupPage {
             property Fact _rateRollI:           controller.getParameterFact(-1, "ATC_RAT_RLL_I")
             property Fact _ratePitchP:          controller.getParameterFact(-1, "ATC_RAT_PIT_P")
             property Fact _ratePitchI:          controller.getParameterFact(-1, "ATC_RAT_PIT_I")
-            property Fact _rateClimbP:          controller.getParameterFact(-1, "PSC_ACCZ_P")
-            property Fact _rateClimbI:          controller.getParameterFact(-1, "PSC_ACCZ_I")
+            property Fact _rateClimbP:          controller.getParameterFact(-1, "r.PSC_D_ACC_P")
+            property Fact _rateClimbI:          controller.getParameterFact(-1, "r.PSC_D_ACC_I")
             property Fact _motSpinArm:          controller.getParameterFact(-1, "MOT_SPIN_ARM")
             property Fact _motSpinMin:          controller.getParameterFact(-1, "MOT_SPIN_MIN")
 

@@ -36,6 +36,10 @@ SetupPage {
 
             property bool _firmware34:       globals.activeVehicle.versionCompare(3, 5, 0) < 0
 
+            // 4.7 replaced ARMING_CHECK with ARMING_SKIPCHK, which inverts the bitmask: a set bit now
+            // means "skip this check" instead of "run this check", and the bit 0 "All" entry is gone.
+            property bool _armingSkipChecks: controller.parameterExists(-1, "ARMING_SKIPCHK")
+
             // Enable/Action parameters
             property Fact _failsafeBatteryEnable:     controller.getParameterFact(-1, "r.BATT_FS_LOW_ACT", false)
             property Fact _failsafeEKFEnable:         controller.getParameterFact(-1, "FS_EKF_ACTION")
@@ -56,7 +60,7 @@ SetupPage {
             property Fact _failsafeBatteryCapacity:      controller.getParameterFact(-1, "r.BATT_LOW_MAH", false)
             property bool _batteryDetected:              controller.parameterExists(-1, "r.BATT_LOW_MAH")
 
-            property Fact _armingCheck: controller.getParameterFact(-1, "ARMING_CHECK")
+            property Fact _armingCheck: controller.getParameterFact(-1, "r.ARMING_SKIPCHK")
 
             property real _margins:     ScreenTools.defaultFontPixelHeight
             property bool _showIcon:    !ScreenTools.isTinyScreen
@@ -370,11 +374,20 @@ SetupPage {
                         anchors.right:      parent.right
                         spacing: _margins
 
+                        QGCLabel {
+                            id:             armingCheckSkipNote
+                            anchors.left:   parent.left
+                            anchors.right:  parent.right
+                            wrapMode:       Text.WordWrap
+                            text:           qsTr("A ticked box means the check is SKIPPED. Leave all boxes clear to run every check.")
+                            visible:        _armingSkipChecks
+                        }
+
                         FactBitmask {
                             id:                 armingCheckBitmask
                             anchors.left:       parent.left
                             anchors.right:      parent.right
-                            firstEntryIsAll:    true
+                            firstEntryIsAll:    !_armingSkipChecks
                             fact:               _armingCheck
                         }
 
@@ -385,7 +398,7 @@ SetupPage {
                             wrapMode:       Text.WordWrap
                             color:          qgcPal.warningText
                             text:            qsTr("Warning: Turning off arming checks can lead to loss of Vehicle control.")
-                            visible:        _armingCheck.value != 1
+                            visible:        _armingSkipChecks ? _armingCheck.value != 0 : _armingCheck.value != 1
                         }
                     }
                 } // Rectangle - Arming checks

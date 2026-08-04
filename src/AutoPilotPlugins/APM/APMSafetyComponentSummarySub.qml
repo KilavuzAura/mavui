@@ -33,14 +33,17 @@ Item {
     property Fact _failsafeBatteryVoltage:       controller.getParameterFact(-1, "r.BATT_LOW_VOLT", false)
     property Fact _failsafeBatteryCapacity:      controller.getParameterFact(-1, "r.BATT_LOW_MAH", false)
 
-    property Fact _armingCheck: controller.getParameterFact(-1, "ARMING_CHECK")
+    // 4.7 replaced ARMING_CHECK with ARMING_SKIPCHK, which inverts the bitmask: a set bit now means
+    // "skip this check", so all checks are on when the value is 0 rather than when bit 0 ("All") is set.
+    property bool _armingSkipChecks: controller.parameterExists(-1, "ARMING_SKIPCHK")
+    property Fact _armingCheck:      controller.getParameterFact(-1, "r.ARMING_SKIPCHK")
 
     Column {
         anchors.fill:       parent
 
         VehicleSummaryRow {
             labelText: qsTr("Arming Checks:")
-            valueText:  _armingCheck.value & 1 ? qsTr("Enabled") : qsTr("Some disabled")
+            valueText:  (_armingSkipChecks ? _armingCheck.value == 0 : _armingCheck.value & 1) ? qsTr("Enabled") : qsTr("Some disabled")
         }
         VehicleSummaryRow {
             labelText: qsTr("GCS failsafe:")

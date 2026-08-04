@@ -61,6 +61,12 @@ ArduRoverFirmwarePlugin::ArduRoverFirmwarePlugin(QObject *parent)
         remapV3_5["BATT_ARM_VOLT"] =    QStringLiteral("ARMING_VOLT_MIN");
         remapV3_5["BATT2_ARM_VOLT"] =   QStringLiteral("ARMING_VOLT2_MIN");
 
+        FirmwarePlugin::remapParamNameMap_t& remapV4_7 = _remapParamName[4][7];
+
+        // 4.7 turned ARMING_CHECK into ARMING_SKIPCHK and inverted its meaning: the bitmask now lists
+        // the checks to SKIP (0 = nothing skipped) and no longer has the bit 0 "All" entry.
+        remapV4_7["ARMING_SKIPCHK"] = QStringLiteral("ARMING_CHECK");
+
         _remapParamNameIntialized = true;
     }
 }
@@ -68,12 +74,6 @@ ArduRoverFirmwarePlugin::ArduRoverFirmwarePlugin(QObject *parent)
 ArduRoverFirmwarePlugin::~ArduRoverFirmwarePlugin()
 {
 
-}
-
-int ArduRoverFirmwarePlugin::remapParamNameHigestMinorVersionNumber(int majorVersionNumber) const
-{
-    // Remapping supports up to 3.5
-    return ((majorVersionNumber == 3) ? 5 : Vehicle::versionNotSetValue);
 }
 
 void ArduRoverFirmwarePlugin::guidedModeChangeAltitude(Vehicle* /*vehicle*/, double /*altitudeChange*/, bool /*pauseVehicle*/)

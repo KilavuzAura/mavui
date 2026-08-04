@@ -54,7 +54,6 @@ public:
 
     QString offlineEditingParamFile(Vehicle *vehicle) const override { Q_UNUSED(vehicle); return QStringLiteral(":/FirmwarePlugin/APM/Plane.OfflineEditing.params"); }
     QString autoDisarmParameter(Vehicle *vehicle) const override { Q_UNUSED(vehicle); return QStringLiteral("LAND_DISARMDELAY"); }
-    int remapParamNameHigestMinorVersionNumber(int majorVersionNumber) const override;
     const FirmwarePlugin::remapParamNameMajorVersionMap_t &paramNameRemapMajorVersionMap() const override { return _remapParamName; }
     QString pauseFlightMode() const override;
     QString takeOffFlightMode() const override;

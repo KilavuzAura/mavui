@@ -29,15 +29,19 @@ Item {
 
     property bool _roverFirmware:           controller.parameterExists(-1, "MODE1") // This catches all usage of ArduRover firmware vehicle types: Rover, Boat...
 
+    // 4.7 replaced ARMING_CHECK with ARMING_SKIPCHK, which inverts the bitmask: a set bit now
+    // means "skip this check" instead of "run this check", and the bit 0 "All" entry is gone.
+    property bool _armingSkipChecks:        controller.parameterExists(-1, "ARMING_SKIPCHK")
+
 
     Column {
         anchors.fill:       parent
 
         VehicleSummaryRow {
             labelText: qsTr("Arming Checks:")
-            valueText: fact ? (fact.value & 1 ? qsTr("Enabled") : qsTr("Some disabled")) : ""
+            valueText: fact ? ((_armingSkipChecks ? fact.value == 0 : fact.value & 1) ? qsTr("Enabled") : qsTr("Some disabled")) : ""
 
-            property Fact fact: controller.getParameterFact(-1, "ARMING_CHECK")
+            property Fact fact: controller.getParameterFact(-1, "r.ARMING_SKIPCHK")
         }
 
         VehicleSummaryRow {

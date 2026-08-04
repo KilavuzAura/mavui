@@ -41,7 +41,6 @@ public:
     ~ArduRoverFirmwarePlugin();
 
     void guidedModeChangeAltitude(Vehicle* vehicle, double altitudeChange, bool pauseVehicle) override;
-    int remapParamNameHigestMinorVersionNumber(int majorVersionNumber) const override;
     const FirmwarePlugin::remapParamNameMajorVersionMap_t& paramNameRemapMajorVersionMap() const override { return _remapParamName; }
     bool supportsNegativeThrust(Vehicle*) const override { return true; }
     bool supportsSmartRTL() const override { return true; }

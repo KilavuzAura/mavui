@@ -108,7 +108,6 @@ public:
     QString brandImageIndoor(const Vehicle *vehicle) const override { Q_UNUSED(vehicle); return QStringLiteral("/qmlimages/APM/BrandImageSub"); }
     QString brandImageOutdoor(const Vehicle *vehicle) const override { Q_UNUSED(vehicle); return QStringLiteral("/qmlimages/APM/BrandImageSub"); }
     const FirmwarePlugin::remapParamNameMajorVersionMap_t& paramNameRemapMajorVersionMap() const override { return _remapParamName; }
-    int remapParamNameHigestMinorVersionNumber(int majorVersionNumber) const override;
     const QVariantList &toolIndicators(const Vehicle *vehicle) override;
     const QVariantList &modeIndicators(const Vehicle *vehicle) override;
     bool adjustIncomingMavlinkMessage(Vehicle *vehicle, mavlink_message_t *message) override;

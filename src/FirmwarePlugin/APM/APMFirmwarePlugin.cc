@@ -742,19 +742,31 @@ QString APMFirmwarePlugin::_internalParameterMetaDataFile(const Vehicle *vehicle
     }
 
     const QString fileNameFormat = QStringLiteral(":/FirmwarePlugin/APM/APMParameterFactMetaData.%1.%2.%3.xml");
-    int currMajor = vehicle->firmwareMajorVersion();
-    int currMinor = vehicle->firmwareMinorVersion();
+    const int vehicleMajor = vehicle->firmwareMajorVersion();
+    const int vehicleMinor = vehicle->firmwareMinorVersion();
+    int currMajor = vehicleMajor;
+    int currMinor = vehicleMinor;
 
-    // Find next newest version available
-    while ((currMajor >= 3) && (currMinor > 0)) {
+    // Find next newest version available. Minor version 0 is a real release (4.0 for example), so it
+    // has to be probed before dropping down to the previous major version.
+    while ((currMajor >= 3) && (currMinor >= 0)) {
         const QString tempFileName = fileNameFormat.arg(vehicleName).arg(currMajor).arg(currMinor);
         if (QFileInfo::exists(tempFileName)) {
+            if ((currMajor != vehicleMajor) || (currMinor != vehicleMinor)) {
+                // Parameters added or renamed by the firmware since this metadata was generated will fall
+                // back to generic metadata: no description, no range, and no enum/bitmask editor. Worth
+                // shouting about, since nothing else in the UI hints that the metadata is stale.
+                qCWarning(APMFirmwarePluginLog) << Q_FUNC_INFO << "No parameter meta data for" << vehicleName
+                                                << QStringLiteral("%1.%2").arg(vehicleMajor).arg(vehicleMinor)
+                                                << "- falling back to" << QStringLiteral("%1.%2").arg(currMajor).arg(currMinor);
+            }
             return tempFileName;
         }
-        currMinor--;
         if (currMinor == 0) {
             currMinor = 10; // Some suitably high possible minor version.
             currMajor--;
+        } else {
+            currMinor--;
         }
     }
     // currMajor or currMinor were likely invalid (-1)
@@ -910,17 +922,22 @@ void APMFirmwarePlugin::guidedModeChangeAltitude(Vehicle *vehicle, double altitu
     }
 }
 
+// 4.7 renamed WPNAV_SPEED to WP_SPD and changed its unit from cm/s to m/s, so the name is looked up
+// through the version remap and the raw value only gets scaled for the older firmwares.
+static const QString kWPNavSpeedParam = QStringLiteral("r.WP_SPD");
+
 bool APMFirmwarePlugin::mulirotorSpeedLimitsAvailable(Vehicle *vehicle) const
 {
-    return vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, "WPNAV_SPEED");
+    return vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, kWPNavSpeedParam);
 }
 
 double APMFirmwarePlugin::maximumHorizontalSpeedMultirotor(Vehicle *vehicle) const
 {
-    const QString speedParam("WPNAV_SPEED");
+    ParameterManager *const paramMgr = vehicle->parameterManager();
 
-    if (vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, speedParam)) {
-        return vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, speedParam)->rawValue().toDouble() * 0.01;  // note cm/s -> m/s
+    if (paramMgr->parameterExists(ParameterManager::defaultComponentId, kWPNavSpeedParam)) {
+        const double speed = paramMgr->getParameter(ParameterManager::defaultComponentId, kWPNavSpeedParam)->rawValue().toDouble();
+        return (vehicle->versionCompare(4, 7, 0) >= 0) ? speed : (speed * 0.01);
     }
 
     return FirmwarePlugin::maximumHorizontalSpeedMultirotor(vehicle);

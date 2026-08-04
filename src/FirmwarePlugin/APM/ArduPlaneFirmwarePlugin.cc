@@ -88,6 +88,12 @@ ArduPlaneFirmwarePlugin::ArduPlaneFirmwarePlugin(QObject *parent)
         remapV4_5["AIRSPEED_MIN"] = QStringLiteral("ARSPD_FBW_MIN");
         remapV4_5["AIRSPEED_MAX"] = QStringLiteral("ARSPD_FBW_MAX");
 
+        FirmwarePlugin::remapParamNameMap_t &remapV4_7 = _remapParamName[4][7];
+
+        // 4.7 turned ARMING_CHECK into ARMING_SKIPCHK and inverted its meaning: the bitmask now lists
+        // the checks to SKIP (0 = nothing skipped) and no longer has the bit 0 "All" entry.
+        remapV4_7["ARMING_SKIPCHK"] = QStringLiteral("ARMING_CHECK");
+
         _remapParamNameIntialized = true;
     }
 }
@@ -95,12 +101,6 @@ ArduPlaneFirmwarePlugin::ArduPlaneFirmwarePlugin(QObject *parent)
 ArduPlaneFirmwarePlugin::~ArduPlaneFirmwarePlugin()
 {
 
-}
-
-int ArduPlaneFirmwarePlugin::remapParamNameHigestMinorVersionNumber(int majorVersionNumber) const
-{
-    // Remapping supports up to 4.5
-    return ((majorVersionNumber == 4) ? 5 : Vehicle::versionNotSetValue);
 }
 
 QString ArduPlaneFirmwarePlugin::takeOffFlightMode() const
