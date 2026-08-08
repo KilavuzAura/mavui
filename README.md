@@ -62,6 +62,24 @@ Varsayılan yollar ortam değişkenleriyle değiştirilebilir:
 | `MAVUI_KEYSTORE` | `~/Android/mavui.keystore` (yoksa APK imzasız bırakılır) |
 | `MAVUI_KEY_ALIAS` / `MAVUI_KEYSTORE_PASS` | boş — apksigner parolayı sorar |
 
+#### Video kaydı Android'de gerçekten çalışıyor mu?
+
+APK uzun süre QtMultimedia ile derlendi; **kayıt butonu vardı ama dosya
+yazılmıyordu.** GStreamer'li derlemede (`QGC_ENABLE_GST_VIDEOSTREAMING=ON`)
+bunun kanıtla doğrulanması gerekiyor — butona basılması yetmez, dosya çıkmalı
+ve `ffprobe` onu decode edebilmeli:
+
+```bash
+./android_kayit_testi.sh kur                 # imzala + telefona kur
+./android_kayit_testi.sh yayin 192.168.x.y   # sahte araç + sentetik H264/RTP
+./android_kayit_testi.sh cek                 # kaydı çek + ffprobe ile doğrula
+```
+
+Telefon ile geliştirme makinesi **aynı Wi-Fi'da** olmalı: akış UDP, `adb
+forward`/`reverse` ise yalnız TCP taşır. Sahte araç şart, çünkü kayıt butonu
+bir kamera nesnesine bağlı (`PhotoVideoControl.qml`) — araç yoksa buton hiç
+görünmez.
+
 Betiğin yaptığı işin elle karşılığı:
 
 ```bash

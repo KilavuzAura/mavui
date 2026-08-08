@@ -59,8 +59,50 @@ if [[ "$HEDEF" == "android" ]]; then
     zorunlu_yol "JDK 17 (JAVA_HOME)"               "$JAVA_HOME/bin/java"
     export PATH="$JAVA_HOME/bin:$PATH"
 
-    # Android'de GStreamer kapali olmali: host kutuphaneleri aarch64 link'ine siziyor,
-    # video QtMultimedia backend'iyle calisir.
+    # Android'de de GStreamer sart: QtMultimedia backend'inde kayit YALANDAN
+    # calisiyor. QtMultimediaReceiver bir QMediaCaptureSession kuruyor ama
+    # akisi tasiyan _mediaPlayer'i ona hic baglamiyor, yani capture session'in
+    # girdisi yok; startRecording() yine de record() cagirip
+    # recordingChanged(true) yayiyor. Sonuc: buton kirmizi, sayac isliyor,
+    # diske tek byte yazilmiyor. Ust akis QGC kusuru, ama APK'yi QtMultimedia
+    # ile derledigimiz surece kullaniciya yalan soyleyen bir buton dagitiyoruz.
+    #
+    # GStreamer daha once "host kutuphaneleri aarch64 link'ine siziyor" diye
+    # kapatilmisti. Gercek sebep bulundu (7 Agu 2026): GStreamer'in libav
+    # eklentisinin .pc dosyalari -latomic istiyor, CMake bunu find_library ile
+    # cozuyor ve NDK sysroot'unda libatomic YOK (clang'in kendi runtime
+    # dizininde duruyor) -> arama host'a dusup /usr/lib/libatomic.so'yu
+    # buluyor -> "ld: error: /usr/lib/libatomic.so is incompatible with
+    # aarch64linux". Ayni sekilde libEGL de host'tan geliyordu.
+    # Cozum degisken adina degil ARAMA YOLUNA dayaniyor: NDK'nin kendi
+    # dizinlerini find_library'ye onceletiyoruz, boylece bu sinifin tamami
+    # (bugun libatomic/libEGL, yarin baskasi) kapaniyor.
+    unset PKG_CONFIG_PATH PKG_CONFIG_LIBDIR PKG_CONFIG_SYSROOT_DIR
+    NDK_TC="$(ls -d "$ANDROID_NDK_ROOT"/toolchains/llvm/prebuilt/*/ 2>/dev/null | head -1)"
+    NDK_TC="${NDK_TC%/}"
+    case "$ABI" in
+        arm64-v8a)   NDK_TRIPLE=aarch64-linux-android; NDK_RT_ARCH=aarch64 ;;
+        armeabi-v7a) NDK_TRIPLE=arm-linux-androideabi;  NDK_RT_ARCH=arm ;;
+        x86_64)      NDK_TRIPLE=x86_64-linux-android;   NDK_RT_ARCH=x86_64 ;;
+        x86)         NDK_TRIPLE=i686-linux-android;     NDK_RT_ARCH=i386 ;;
+        *)           NDK_TRIPLE=""; NDK_RT_ARCH="" ;;
+    esac
+    NDK_LIB_YOLLARI=()
+    if [[ -n "$NDK_TRIPLE" && -n "$NDK_TC" ]]; then
+        # clang runtime (libatomic burada, sysroot'ta degil)
+        RT="$(ls -d "$NDK_TC"/lib/clang/*/lib/linux/"$NDK_RT_ARCH" 2>/dev/null | sort -V | tail -1)"
+        [[ -d "$RT" ]] && NDK_LIB_YOLLARI+=("$RT")
+        # platform kutuphaneleri (libEGL vb.); en yuksek API seviyesi
+        API="$(ls "$NDK_TC/sysroot/usr/lib/$NDK_TRIPLE" 2>/dev/null | grep -E '^[0-9]+$' | sort -n | tail -1)"
+        [[ -n "$API" ]] && NDK_LIB_YOLLARI+=("$NDK_TC/sysroot/usr/lib/$NDK_TRIPLE/$API")
+    fi
+    if (( ${#NDK_LIB_YOLLARI[@]} )); then
+        NDK_LIB_PATH="$(IFS=';'; echo "${NDK_LIB_YOLLARI[*]}")"
+        echo "NDK kutuphane arama yolu: $NDK_LIB_PATH"
+    else
+        NDK_LIB_PATH=""
+        echo "UYARI: NDK kutuphane yollari bulunamadi; host kutuphanesi sizabilir."
+    fi
     CMAKE_FLAGS=(-S . -B "$BUILD_DIR" -G Ninja
                  -DCMAKE_BUILD_TYPE=Release
                  -DQGC_BUILD_TESTING=OFF
@@ -68,8 +110,23 @@ if [[ "$HEDEF" == "android" ]]; then
                  -DQT_ANDROID_BUILD_ALL_ABIS=OFF
                  -DQT_HOST_PATH="$QT_HOST_PATH"
                  -DQT_ANDROID_SIGN_APK=OFF
-                 -DQGC_ENABLE_GST_VIDEOSTREAMING=OFF
-                 -DQGC_ENABLE_QT_VIDEOSTREAMING=ON)
+                 -DQGC_ENABLE_GST_VIDEOSTREAMING=ON
+                 -DQGC_ENABLE_QT_VIDEOSTREAMING=OFF)
+    [[ -n "$NDK_LIB_PATH" ]] && CMAKE_FLAGS+=("-DCMAKE_LIBRARY_PATH=$NDK_LIB_PATH")
+
+    # GStreamer'in Android paketi 419 MB ve cmake'in indiricisi proxy'li agda
+    # yarida kopuyor (CPM/FetchContent yeniden denemiyor, configure komple
+    # patliyor). Elde acilmis kopya varsa onu kullan; yoksa cmake kendisi
+    # indirmeyi dener. Hazirlamak icin:
+    #   mkdir -p ~/Android/gst-cache && cd ~/Android/gst-cache
+    #   curl -LC - -O https://gstreamer.freedesktop.org/data/pkg/android/1.22.12/gstreamer-1.0-android-universal-1.22.12.tar.xz
+    #   mkdir -p gstreamer-1.0-android-universal-1.22.12
+    #   tar xf gstreamer-1.0-android-universal-1.22.12.tar.xz -C gstreamer-1.0-android-universal-1.22.12
+    GST_ANDROID_DIR="${GST_ANDROID_DIR:-$HOME/Android/gst-cache/gstreamer-1.0-android-universal-1.22.12}"
+    if [[ -d "$GST_ANDROID_DIR/arm64" ]]; then
+        echo "GStreamer Android paketi yerelden: $GST_ANDROID_DIR"
+        CMAKE_FLAGS+=("-DCPM_gstreamer_SOURCE=$GST_ANDROID_DIR")
+    fi
 
     # Masaustundeki ile ayni gerekce: QGC ust akisi Qt 6.8.3'e kilitli.
     QT_VER="$("$QT_HOST_PATH/bin/qmake6" -query QT_VERSION 2>/dev/null || true)"
