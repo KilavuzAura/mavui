@@ -1365,6 +1365,7 @@ Item {
 
             property real _labelWidth:  ScreenTools.defaultFontPixelWidth * 12
             property real _latLonWidth: ScreenTools.defaultFontPixelWidth * 12
+            property real _camWidth:    ScreenTools.defaultFontPixelWidth * 8
             property real _yawWidth:    ScreenTools.defaultFontPixelWidth * 7
 
             function _coord(latText, lonText) {
@@ -1408,8 +1409,8 @@ Item {
                     QGCLabel { text: qsTr("Position"); font.bold: true; Layout.preferredWidth: _labelWidth }
                     QGCLabel { text: qsTr("Lat");      font.bold: true; Layout.preferredWidth: _latLonWidth }
                     QGCLabel { text: qsTr("Lon");      font.bold: true; Layout.preferredWidth: _latLonWidth }
-                    QGCLabel { text: qsTr("Camera");   font.bold: true }
-                    QGCLabel { text: qsTr("Yaw (°)");  font.bold: true }
+                    QGCLabel { text: qsTr("Camera");   font.bold: true; Layout.preferredWidth: _camWidth }
+                    QGCLabel { text: qsTr("Yaw (°)");  font.bold: true; Layout.preferredWidth: _yawWidth }
                     QGCLabel { text: qsTr("Anchor");   font.bold: true }
                 }
 
@@ -1425,8 +1426,11 @@ Item {
                                    text: startCoord ? startCoord.longitude.toFixed(7) : (mapCenter ? mapCenter.longitude.toFixed(7) : "") }
                     // Start anchor: dropped once at the start point, after the dive in
                     // place and before the first travel leg. It is a departure gate, not
-                    // a photo point — no camera turn and no shutter here.
-                    QGCCheckBox  { id: homeAnchorCheck; text: qsTr("Start anchor"); checked: startAnchor }
+                    // a photo point — no camera turn and no shutter here, so those two
+                    // cells stay empty and the box lines up under the Anchor column.
+                    Item         { Layout.preferredWidth: _camWidth }
+                    Item         { Layout.preferredWidth: _yawWidth }
+                    QGCCheckBox  { id: homeAnchorCheck; text: qsTr("On"); checked: startAnchor }
                 }
 
                 Repeater {
@@ -1463,7 +1467,7 @@ Item {
                         QGCLabel     { text: qsTr("Waypoint %1").arg(index + 1); Layout.preferredWidth: _labelWidth }
                         QGCTextField { id: latField;  Layout.preferredWidth: _latLonWidth; placeholderText: qsTr("Lat") }
                         QGCTextField { id: lonField;  Layout.preferredWidth: _latLonWidth; placeholderText: qsTr("Lon") }
-                        QGCCheckBox  { id: camCheck;  text: qsTr("On"); checked: true }
+                        QGCCheckBox  { id: camCheck;  Layout.preferredWidth: _camWidth; text: qsTr("On"); checked: true }
                         QGCTextField { id: yawField;  Layout.preferredWidth: _yawWidth; enabled: camCheck.checked; placeholderText: qsTr("auto") }
                         // Anchor: the vehicle drops anchor at this location — it locks the
                         // point and does not advance to the next waypoint until it has stayed
