@@ -263,26 +263,43 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
         }
         first = false;
         b.cruise(lat, lon);                             // 2) travel to the target at depth
-        b.waypoint(lat, lon, kSurfaceDepth, tuning.surfaceSettle);  // 3) surface and settle
 
         const int heading = (camera && yaw >= 0.0)
                                 ? (static_cast<int>(yaw) % 360 + 360) % 360
                                 : kNoYaw;
 
         if (anchor) {
-            // 4) One command does the whole stop: settle on the point, turn to the
-            //    camera heading, wait out the swing, fire, then hold. Spelling that
-            //    out as CONDITION_YAW + CONDITION_DELAY + DO_DIGICAM_CONTROL beside
-            //    the anchor only worked when the queue finished inside the hold --
-            //    AP_Mission drops a pending queue the moment the nav command
-            //    completes, so a short hold silently meant no photo. Nothing has to
-            //    be padded to fit any more, so photoWindow is the plain hold after
-            //    the shutter.
+            // 3) Anchor at depth, on the target. Two things happen here rather than at
+            //    the surface: the settle gate closes out the travel error while the
+            //    vehicle is still submerged, and the camera turn runs here, where the
+            //    thrusters have full authority and the hull is nowhere near the
+            //    waterline. The vehicle reaches the surface already aimed.
+            b.command(kCmdAuraAnchor, QJsonArray({ 0, tuning.anchorRadius,
+                                                   tuning.anchorSettle, tuning.anchorGuard,
+                                                   heading, 0, 0 }));
+            // 4) Straight up. Same coordinate as the anchor it just held, so the leg
+            //    has no horizontal length and the only motion at the surface is
+            //    vertical - the one rule this pattern exists to keep.
+            b.waypoint(lat, lon, kSurfaceDepth, tuning.surfaceSettle);
+            // 5) Anchor again at the surface and shoot. The vehicle still holds its
+            //    point (that is what an anchor does, and holding station is not the
+            //    horizontal travel the pattern forbids), so the frame is taken where
+            //    the plan asked for it. Re-stating the heading costs nothing - the
+            //    turn is already done - but it re-arms the +-2 deg gate in
+            //    verify_anchor(), so an ascent that nudged the nose cannot produce an
+            //    off-aim frame. Spelling the shutter out as CONDITION_YAW +
+            //    CONDITION_DELAY + DO_DIGICAM_CONTROL beside an anchor only worked
+            //    when the queue finished inside the hold -- AP_Mission drops a pending
+            //    queue the moment the nav command completes, so a short hold silently
+            //    meant no photo. Inside the anchor the order is guaranteed and nothing
+            //    has to be padded to fit, so photoWindow is the plain hold after the
+            //    shutter.
             b.command(kCmdAuraAnchor, QJsonArray({ photoWindowS, tuning.anchorRadius,
                                                    tuning.anchorSettle, tuning.anchorGuard,
                                                    heading, camera ? 1 : 0,
                                                    std::min(photoBeforeS, kMaxAnchorPhotoDelay) }));
         } else if (camera) {
+            b.waypoint(lat, lon, kSurfaceDepth, tuning.surfaceSettle);  // 3) surface and settle
             // No anchor: the vehicle is not held on the point, so the shutter still
             // has to be assembled from separate items and the window padded to
             // outlast them.
@@ -313,6 +330,9 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
             b.command(kCmdConditionDelay, QJsonArray({ photoBeforeS, 0, 0, 0, 0, 0, 0 })); // 5) wait
             b.command(kCmdDoDigicamControl, QJsonArray({ 0, 0, 0, 0, 1, 0, 0 }));          // 6) take photo
             b.waypoint(lat, lon, kSurfaceDepth, window);                                   // 7) hold the window
+        } else {
+            // Neither anchored nor photographed: the stop is just a surfacing.
+            b.waypoint(lat, lon, kSurfaceDepth, tuning.surfaceSettle);
         }
 
         prevLat = lat;
@@ -409,6 +429,11 @@ QVariantList StarMissionOnePlanCreator::extractTargets() const
     // the items that spell it out:
     //     surface WP -> anchor(31010)                                   anchored stop
     //     surface WP -> [CONDITION_YAW] CONDITION_DELAY DO_DIGICAM, WP  unanchored stop
+    // An anchored stop also has a FIRST anchor, at cruise depth, ahead of its surface
+    // waypoint - that is where the turn happens. It carries the same heading, so the
+    // scan below reads everything it needs from the surface anchor and the deep one is
+    // simply travel as far as this walk is concerned (it is a command item, never a
+    // surface waypoint, so it cannot be mistaken for a stop of its own).
     // Everything else is travel: cruise legs sit at the cruise depth and a dive in
     // place just repeats the previous coordinate, so neither can be mistaken for a
     // stop. The plan always closes with a surface waypoint back at the start; that one

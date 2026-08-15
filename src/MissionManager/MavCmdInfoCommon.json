@@ -1303,6 +1303,29 @@
                 "min":              0,
                 "max":              31
             }
+        },
+        {
+            "id":           31015,
+            "rawName":      "MAV_CMD_AURA_POSITION_FIX",
+            "friendlyName": "Position fix",
+            "description":  "Snaps the navigation solution onto the NEXT waypoint's coordinate: the vehicle accepts that it is standing on that point, the same operation as SonarView's Set Location. Place it where the vehicle really is on a known point to clear accumulated DVL drift. Horizontal only, depth is untouched. The EKF accepts it only while dead reckoning: with a GPS-class source still fusing (UGPS, GPS_INPUT, SITL's fake GPS) the fix is rejected and the mission carries on with the old solution.",
+            "category":     "AURA",
+            "param1": {
+                "label":            "Dwell",
+                "units":            "secs",
+                "default":          1,
+                "decimalPlaces":    0,
+                "min":              0,
+                "max":              60
+            },
+            "param2": {
+                "label":            "Accuracy",
+                "units":            "m",
+                "default":          0,
+                "decimalPlaces":    2,
+                "min":              0,
+                "max":              100
+            }
         }
     ]
 }

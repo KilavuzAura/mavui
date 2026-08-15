@@ -565,7 +565,11 @@ QList<MAV_CMD> APMFirmwarePlugin::supportedMissionCommands(QGCMAVLink::VehicleCl
 
     // AURA: ArduSub fork'una eklenen ozel gorev komutlari
     QList<MAV_CMD> auraSubCommands = {
-        MAV_CMD_USER_1,     // 31010 - drop anchor
+        MAV_CMD_USER_1,                     // 31010 - drop anchor
+        // 31015 sits outside the MAV_CMD_USER_1..5 block (31010-31014), so there is no
+        // enumerator to name it. The id is all this list carries and MissionCommandUIInfo
+        // casts the JSON id the same way, so the cast is the whole story.
+        static_cast<MAV_CMD>(31015),        // 31015 - position fix
     };
 
     if (vehicleClass == QGCMAVLink::VehicleClassSub) {
