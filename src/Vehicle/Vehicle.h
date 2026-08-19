@@ -656,6 +656,22 @@ public:
     /// Same as sendMavCommand but available from Qml.
     Q_INVOKABLE void sendCommand(int compId, int command, bool showError, double param1 = 0.0, double param2 = 0.0, double param3 = 0.0, double param4 = 0.0, double param5 = 0.0, double param6 = 0.0, double param7 = 0.0);
 
+    /// AURA: snap the vehicle's navigation solution onto a known coordinate — it accepts
+    /// that it is standing on that point. Same operation as SonarView's "Set Location" and
+    /// as the MAV_CMD_AURA_POSITION_FIX (31015) mission item, but issued live rather than
+    /// from a plan, so it uses the standard MAV_CMD_EXTERNAL_POSITION_ESTIMATE (43003)
+    /// that stock ArduPilot already handles — no fork-only command and no reflash.
+    ///     @param lat          latitude in degrees
+    ///     @param lon          longitude in degrees
+    ///     @param accuracyM    1-sigma horizontal uncertainty (m); <= 0 means "unknown",
+    ///                         which lets the EKF fall back to its own position noise
+    /// Horizontal only: the altitude element is ignored by NavEKF3_core::setLatLng, which
+    /// is right — depth comes from the barometer and is never the thing that drifted. The
+    /// EKF accepts the reset only while dead reckoning; with a GPS-class source still
+    /// fusing (UGPS, GPS_INPUT, SITL's fake GPS) the command is refused and the user is
+    /// told so.
+    Q_INVOKABLE void fixPositionEstimate(double lat, double lon, double accuracyM = 0.0);
+
     typedef enum {
         MavCmdResultCommandResultOnly,          ///< commandResult specifies full success/fail info
         MavCmdResultFailureNoResponseToCommand, ///< No response from vehicle to command

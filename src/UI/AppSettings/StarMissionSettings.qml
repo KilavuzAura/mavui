@@ -90,6 +90,18 @@ SettingsPage {
 
     SettingsGroupLayout {
         Layout.fillWidth:   true
+        heading:            qsTr("Start Gate")
+        headingDescription: qsTr("What the plan does before the first dive. The vehicle is driven onto the start marker by hand, so the mission opens by holding that point and then telling the EKF where it is: MAV_CMD_AURA_POSITION_FIX (31015) snaps the navigation solution onto the plan's start coordinate, the same operation as SonarView's Set Location.")
+
+        DescribedField {
+            label:       qsTr("Start hold")
+            fact:        _starMissionSettings.startWait
+            description: qsTr("How long the vehicle holds the start point before the solution is snapped onto it. This is the window in which it stops moving and the estimator settles -- snapping while it is still gliding writes that glide straight back in. 0 removes the hold and the position fix together. The fix is only accepted while dead reckoning: with UGPS, GPS_INPUT or SITL's fake GPS still fusing the firmware rejects it, says so, and carries on.")
+        }
+    }
+
+    SettingsGroupLayout {
+        Layout.fillWidth:   true
         heading:            qsTr("Dive / Surface Holds")
         headingDescription: qsTr("Extra wait on the vertical legs of the pattern.")
 
@@ -118,7 +130,7 @@ SettingsPage {
                                     qsTr("Restore every value on this page to its default?\n\n") +
                                         qsTr("Settle radius 1.0 m, settle time 3 s, guard timeout auto, ") +
                                         qsTr("delay before shutter 3 s, photo window 5 s, ") +
-                                        qsTr("dive settle 5 s, surface settle 1 s."),
+                                        qsTr("start hold 10 s, dive settle 5 s, surface settle 1 s."),
                                     Dialog.Ok | Dialog.Cancel,
                                     function () {
                                         _starMissionSettings.resetToDefaults()

@@ -57,6 +57,7 @@ constexpr int    kYawRate       = 90;   // camera yaw rate (deg/s)
 // WPNAV_RADIUS the hold timer runs even if drift then carries it away, and a
 // vertical leg completes while the sub is still shallow.
 struct MissionTuning {
+    int    startWait;       // seconds to hold the start point before the position fix
     int    diveSettle;      // seconds to settle after diving
     int    surfaceSettle;   // seconds to settle after surfacing
     double anchorRadius;    // settle radius (m); 0 disables the settle gate
@@ -70,6 +71,7 @@ MissionTuning loadTuning()
 {
     StarMissionSettings* s = SettingsManager::instance()->starMissionSettings();
     return {
+        s->startWait()->rawValue().toInt(),
         s->diveSettle()->rawValue().toInt(),
         s->surfaceSettle()->rawValue().toInt(),
         s->anchorRadius()->rawValue().toDouble(),
@@ -85,6 +87,11 @@ constexpr int kCmdConditionDelay    = 112;
 constexpr int kCmdConditionYaw      = 115;
 constexpr int kCmdDoDigicamControl  = 203;
 constexpr int kCmdAuraAnchor        = 31010; // MAV_CMD_USER_1 in the aurapilot ArduSub fork
+constexpr int kCmdAuraPositionFix   = 31015; // MAV_CMD_AURA_POSITION_FIX in the same fork
+// Position-fix dwell (param1). 0 is not "advance immediately": the firmware reads it as
+// its own 1 s default, which is what the reset needs to travel through the estimator,
+// AP_InertialNav and the position controller before the next leg is computed from it.
+constexpr int kPositionFixDwell     = 0;
 // Anchor param5 (heading, whole degrees): negative means "keep the current heading".
 // 0 is due north, so an unset slot must be -1, never 0.
 constexpr int kNoYaw                = -1;
@@ -181,7 +188,10 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
                                                double                 bottomClearance,
                                                double                 photoBefore,
                                                double                 photoWindow,
-                                               bool                   startAnchor)
+                                               bool                   startAnchor,
+                                               double                 startWait,
+                                               double                 diveSettle,
+                                               bool                   returnHome)
 {
     if (!home.isValid() || targets.isEmpty()) {
         return;
@@ -225,6 +235,19 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
     const int photoBeforeS = static_cast<int>(std::lround(photoBefore));
     const int photoWindowS = static_cast<int>(std::lround(photoWindow));
 
+    // The two hold boxes work the same way: blank/nonsense means "use App Settings",
+    // but an explicit 0 is a value in its own right and is kept. For the start hold 0
+    // also switches the whole start gate off, and for the dive hold it means "trust
+    // WPNAV_RADIUS", so neither may be swallowed by the fallback.
+    if (!std::isfinite(startWait) || startWait < 0.0) {
+        startWait = tuning.startWait;
+    }
+    if (!std::isfinite(diveSettle) || diveSettle < 0.0) {
+        diveSettle = tuning.diveSettle;
+    }
+    const int startWaitS  = static_cast<int>(std::lround(startWait));
+    const int diveSettleS = static_cast<int>(std::lround(diveSettle));
+
     // Never cruise shallower than the surface clearance: the cruise legs are the
     // only part of the pattern that runs blind, and a too-shallow leg puts the
     // hull (and the mission) at the waterline. Surfacing for a photo is a
@@ -238,6 +261,26 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
     double prevLon = home.longitude();
     bool   first   = true;
 
+    // 0) Start gate: hold the start point, then tell the EKF where that point is.
+    //    The vehicle is driven onto the start marker by hand, so the mission opens by
+    //    holding whatever point it was left on - an anchor, because it locks where the
+    //    vehicle IS. A waypoint would first fly to where the drifted solution thinks
+    //    the start is, which is the error this gate exists to remove.
+    //    MAV_CMD_AURA_POSITION_FIX then snaps the solution onto the coordinate of the
+    //    NEXT nav item that stores a Location - the dive in place emitted right below,
+    //    which carries the start coordinate. Order matters: the fix has to come after
+    //    the hold, because snapping while the vehicle is still gliding writes that
+    //    glide back into the solution it was meant to clean up.
+    //    Firmware note: the fix is only accepted while dead reckoning. With a GPS-class
+    //    source still fusing (UGPS, GPS_INPUT, SITL's fake GPS) it is rejected, says so
+    //    over STATUSTEXT, and the mission carries on unchanged.
+    if (startWaitS > 0) {
+        b.command(kCmdAuraAnchor, QJsonArray({ startWaitS, tuning.anchorRadius,
+                                               tuning.anchorSettle, tuning.anchorGuard,
+                                               kNoYaw, 0, 0 }));
+        b.command(kCmdAuraPositionFix, QJsonArray({ kPositionFixDwell, 0, 0, 0, 0, 0, 0 }));
+    }
+
     for (const QVariant& targetVar : targets) {
         const QVariantMap target = targetVar.toMap();
         const QGeoCoordinate coord = target.value(QStringLiteral("coordinate")).value<QGeoCoordinate>();
@@ -250,7 +293,7 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
         const double yaw    = target.value(QStringLiteral("yaw"), -1.0).toDouble();
         const bool   anchor = target.value(QStringLiteral("anchor")).toBool();
 
-        b.cruise(prevLat, prevLon, tuning.diveSettle);  // 1) dive in place and settle at cruise depth
+        b.cruise(prevLat, prevLon, diveSettleS);        // 1) dive in place and settle at cruise depth
         if (first && startAnchor) {
             // 1b) Start anchor: a departure gate, not a station. Duration 0 means the
             //     settle gate alone decides — as soon as the vehicle has held the start
@@ -339,9 +382,15 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
         prevLon = lon;
     }
 
-    b.cruise(prevLat, prevLon, tuning.diveSettle);   // dive in place and settle at the last target
-    b.cruise(home.latitude(), home.longitude());     // return to home underwater
-    b.waypoint(home.latitude(), home.longitude(), kSurfaceDepth); // surface, mission complete
+    // Return leg. Optional, and off by default: the mission otherwise ends on the last
+    // stop, with the vehicle holding at the surface where it took the final photo. The
+    // rule is "after the LAST target", not "after the third" - the pattern takes any
+    // number of them.
+    if (returnHome) {
+        b.cruise(prevLat, prevLon, diveSettleS);         // dive in place and settle at the last target
+        b.cruise(home.latitude(), home.longitude());     // return to home underwater
+        b.waypoint(home.latitude(), home.longitude(), kSurfaceDepth); // surface, mission complete
+    }
 
     QJsonObject mission;
     mission[QStringLiteral("cruiseSpeed")]            = 15;
@@ -414,6 +463,28 @@ bool isSurfaceWaypoint(SimpleMissionItem* item)
 }
 } // namespace
 
+QGeoCoordinate StarMissionOnePlanCreator::extractStart() const
+{
+    MissionController* missionController = _planMasterController ? _planMasterController->missionController() : nullptr;
+    QmlObjectListModel* items = missionController ? missionController->visualItems() : nullptr;
+    if (!items) {
+        return QGeoCoordinate();
+    }
+
+    // Index 0 is the mission settings (Launch) item, which is exactly what must not be
+    // trusted here - skip it and take the first item that carries a real coordinate.
+    // In our pattern that is the dive in place the plan opens with; the two start-gate
+    // commands ahead of it (anchor, position fix) carry none, so they are stepped over
+    // without a special case.
+    for (int i = 1; i < items->count(); i++) {
+        SimpleMissionItem* item = qobject_cast<SimpleMissionItem*>(items->get(i));
+        if (item && item->specifiesCoordinate() && item->coordinate().isValid()) {
+            return item->coordinate();
+        }
+    }
+    return QGeoCoordinate();
+}
+
 QVariantList StarMissionOnePlanCreator::extractTargets() const
 {
     QVariantList targets;
@@ -436,15 +507,21 @@ QVariantList StarMissionOnePlanCreator::extractTargets() const
     // surface waypoint, so it cannot be mistaken for a stop of its own).
     // Everything else is travel: cruise legs sit at the cruise depth and a dive in
     // place just repeats the previous coordinate, so neither can be mistaken for a
-    // stop. The plan always closes with a surface waypoint back at the start; that one
-    // ends the mission and is not a target.
+    // stop. A plan with the return leg closes with a surface waypoint back at the
+    // start; that one ends the mission and is not a target.
+    const QGeoCoordinate start = missionController->plannedHomePosition();
     const int count = items->count();
     for (int i = 1; i < count; i++) {
         SimpleMissionItem* wp = qobject_cast<SimpleMissionItem*>(items->get(i));
         if (!wp || !isSurfaceWaypoint(wp)) {
             continue;
         }
-        if (i == count - 1) {
+        // Being last is not enough to call it the mission end. With the return leg
+        // switched off the plan stops ON the final target, and a target that is neither
+        // anchored nor photographed is a bare surface waypoint - identical in shape to
+        // the closing one. What actually separates them is where they are: only the
+        // closing waypoint sits on the start point.
+        if (i == count - 1 && start.isValid() && wp->coordinate().distanceTo(start) < 1.0) {
             break;
         }
 

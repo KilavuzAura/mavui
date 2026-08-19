@@ -280,7 +280,18 @@ Item {
         // the user had just clicked them, so the map, the Table, Undo and Finish all
         // work unchanged - and reopening the mode on a plan no longer means retyping it.
         var recovered = _planMasterController.containsItems ? creator.extractTargets() : []
-        var start     = _missionController.plannedHomePosition
+        // The start point comes from the PLAN, not from the Launch marker. Launch is
+        // whatever sat at seq 0 of the load, and a plan downloaded from the vehicle
+        // carries the vehicle's own home there - where it armed, not where the plan
+        // starts; a plan with no home at all gets one parked 30 m north of the first
+        // coordinate. Either way, seeding from Launch dropped the start on a point the
+        // plan never had, and finishing from there turned that point into an extra stop.
+        // The plan's own first coordinate item is the dive in place, which sits on the
+        // real start. Launch stays the fallback for a plan this creator cannot read.
+        var start = recovered.length > 0 ? creator.extractStart() : _missionController.plannedHomePosition
+        if (!start || !start.isValid) {
+            start = _missionController.plannedHomePosition
+        }
         _planMasterController.removeAll()
         _starMissionHomeSet  = false
         _starMissionSetStart = false
@@ -411,11 +422,24 @@ Item {
         }
     }
 
+    // Every Star Mission box is a plain QGCTextField with no validator, so the
+    // operator's keyboard decides the decimal separator. parseFloat() only ever
+    // accepts a dot: parseFloat("0,4") stops at the comma and returns 0, which the
+    // callers below read as "box is empty" and silently replace with their default.
+    // That is how a 0.4 m depth box produced a -1 m plan. Normalise the separator
+    // once, here, so a comma never changes the mission.
+    function _starMissionNumber(text) {
+        if (typeof text !== "string") {
+            return parseFloat(text)
+        }
+        return parseFloat(text.trim().replace(",", "."))
+    }
+
     // Cruise depth from a UI text box: empty/invalid falls back to -1 m and a
     // positive number is read as a depth (the vehicle must never be sent above
     // the surface). Kept in one place so the banner and the table agree.
     function _starMissionDepth(depthText) {
-        var depth = parseFloat(depthText)
+        var depth = _starMissionNumber(depthText)
         if (isNaN(depth) || depth === 0) {
             return -1.0
         }
@@ -425,14 +449,14 @@ Item {
     // Surface/bottom clearance box: a distance, so the sign is dropped. Empty or
     // nonsense returns NaN and the plan creator falls back to its own default.
     function _starMissionClearance(text) {
-        var value = parseFloat(text)
+        var value = _starMissionNumber(text)
         return (isNaN(value) || value === 0) ? NaN : Math.abs(value)
     }
 
     // Photo timing box (seconds). Empty or nonsense returns NaN so the plan creator
     // keeps its own default (3 s before the shutter, 5 s window).
     function _starMissionWait(text) {
-        var value = parseFloat(text)
+        var value = _starMissionNumber(text)
         return (isNaN(value) || value < 0) ? NaN : value
     }
 
@@ -455,10 +479,14 @@ Item {
         var photoBefore = _starMissionWait(starMissionPhotoBeforeField.text)
         var photoWindow = _starMissionWait(starMissionPhotoWindowField.text)
         var startAnchor = starMissionStartAnchorCheck.checked
+        var startWait   = _starMissionWait(starMissionStartWaitField.text)
+        var diveSettle  = _starMissionWait(starMissionDiveSettleField.text)
+        var returnHome  = starMissionReturnHomeCheck.checked
         _exitStarMissionMode()
         if (targets.length > 0) {
             _starMissionCreator.createFullPlan(home, targets, depth, autoDepth, surface, bottom,
-                                               photoBefore, photoWindow, startAnchor)
+                                               photoBefore, photoWindow, startAnchor,
+                                               startWait, diveSettle, returnHome)
         }
     }
 
@@ -1008,6 +1036,17 @@ Item {
                         checked: true
                     }
 
+                    QGCCheckBox {
+                        id:      starMissionReturnHomeCheck
+                        text:    qsTr("Başlangıca dön")
+                        // Off by default: the mission ends on the last stop and the vehicle
+                        // holds there at the surface, where the crew can pick it up. Ticked,
+                        // the plan closes with a dive in place, a submerged leg back to the
+                        // start point and a final surfacing there. Applies to whichever
+                        // target is last, however many there are.
+                        checked: false
+                    }
+
                     QGCLabel { text: qsTr("Foto öncesi (sn)") }
 
                     QGCTextField {
@@ -1028,6 +1067,38 @@ Item {
                         // sequences the turn and the shutter itself). Without Anchor:
                         // the whole photo window, padded to outlast the queue.
                         // Empty = the App Settings -> Mission One value.
+                    }
+                }
+
+                // Start gate + dive hold. The start gate is the pair of items the plan
+                // opens with: the vehicle holds the point it was placed on for this
+                // long, then MAV_CMD_AURA_POSITION_FIX tells the EKF that point is the
+                // plan's start coordinate. 0 removes both.
+                RowLayout {
+                    Layout.alignment:   Qt.AlignHCenter
+                    spacing:            ScreenTools.defaultFontPixelWidth
+
+                    QGCLabel { text: qsTr("Başlangıç beklemesi (sn)") }
+
+                    QGCTextField {
+                        id:                     starMissionStartWaitField
+                        Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 7
+                        placeholderText:        _starMissionSettings.startWait.valueString
+                        // Hold on the start point before the position fix and the first
+                        // dive. Empty = the App Settings -> Mission One value; 0 drops
+                        // the hold and the position fix together.
+                    }
+
+                    QGCLabel { text: qsTr("Dalış beklemesi (sn)") }
+
+                    QGCTextField {
+                        id:                     starMissionDiveSettleField
+                        Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 7
+                        placeholderText:        _starMissionSettings.diveSettle.valueString
+                        // Hold on every dive-in-place waypoint. ArduSub calls a waypoint
+                        // reached within WPNAV_RADIUS in 3D, so a short dive completes
+                        // while the vehicle is still shallow and the travel leg then runs
+                        // at the wrong depth. Empty = the App Settings value.
                     }
                 }
 
@@ -1062,7 +1133,10 @@ Item {
                                                                                     anchorAll:   starMissionAnchorCheck.checked,
                                                                                     startAnchor: starMissionStartAnchorCheck.checked,
                                                                                     photoBeforeText: starMissionPhotoBeforeField.text,
-                                                                                    photoWindowText: starMissionPhotoWindowField.text }).open()
+                                                                                    photoWindowText: starMissionPhotoWindowField.text,
+                                                                                    startWaitText:   starMissionStartWaitField.text,
+                                                                                    diveSettleText:  starMissionDiveSettleField.text,
+                                                                                    returnHome:      starMissionReturnHomeCheck.checked }).open()
 
                         function _mapCenter() {
                             var centerPoint = Qt.point(editorMap.centerViewport.left + (editorMap.centerViewport.width / 2), editorMap.centerViewport.top + (editorMap.centerViewport.height / 2))
@@ -1355,21 +1429,32 @@ Item {
             property bool   startAnchor:    false   ///< banner "Start anchor" seeds the Home row checkbox
             property string photoBeforeText: ""     ///< CONDITION_DELAY before the shutter (s)
             property string photoWindowText: ""     ///< hold on the photo-window waypoint (s)
+            property string startWaitText:   ""     ///< hold on the start point before the position fix (s)
+            property string diveSettleText:  ""     ///< hold on every dive-in-place waypoint (s)
+            property bool   returnHome:      false  ///< banner "Başlangıca dön" seeds the checkbox below
             property int    wpCount:    0       ///< rows; sized on completion, grown by "+ Waypoint"
 
             // Size the table only once createObject has applied seedTargets. Binding
             // wpCount to seedTargets.length instead would race: the rows get built
             // during creation, while seedTargets is still the empty default, so their
-            // Component.onCompleted could seed from nothing. Always one spare blank row.
-            Component.onCompleted: wpCount = Math.max(3, seedTargets.length + 1)
+            // Component.onCompleted could seed from nothing.
+            // The table never invents rows. It opens on exactly what is already there -
+            // the stops recovered from the plan, or nothing at all on a blank sheet -
+            // and every further row is one the operator asked for with "+ Waypoint".
+            // A spare blank row reads as a waypoint the mission is missing, which is
+            // worse than one extra click.
+            Component.onCompleted: wpCount = seedTargets.length
 
             property real _labelWidth:  ScreenTools.defaultFontPixelWidth * 12
             property real _latLonWidth: ScreenTools.defaultFontPixelWidth * 12
             property real _camWidth:    ScreenTools.defaultFontPixelWidth * 8
             property real _yawWidth:    ScreenTools.defaultFontPixelWidth * 7
 
+            // Same decimal-separator trap as the depth box, but worse: a comma in
+            // "40,7493696" truncates the coordinate to 40 and the waypoint lands
+            // hundreds of kilometres away instead of merely at the wrong depth.
             function _coord(latText, lonText) {
-                return QtPositioning.coordinate(parseFloat(latText), parseFloat(lonText))
+                return QtPositioning.coordinate(_starMissionNumber(latText), _starMissionNumber(lonText))
             }
 
 
@@ -1383,7 +1468,7 @@ Item {
                     }
                     targets.push({ coordinate: _coord(row.latText, row.lonText),
                                    camera:     row.camOn,
-                                   yaw:        (row.camOn && row.yawText.length > 0) ? parseFloat(row.yawText) : -1,
+                                   yaw:        (row.camOn && row.yawText.length > 0) ? _starMissionNumber(row.yawText) : -1,
                                    anchor:     row.anchorOn })
                 }
                 if (targets.length === 0) {
@@ -1397,7 +1482,10 @@ Item {
                                            _starMissionClearance(bottomClearanceField.text),
                                            _starMissionWait(photoBeforeField.text),
                                            _starMissionWait(photoWindowField.text),
-                                           homeAnchorCheck.checked)
+                                           homeAnchorCheck.checked,
+                                           _starMissionWait(startWaitField.text),
+                                           _starMissionWait(diveSettleField.text),
+                                           returnHomeCheck.checked)
             }
 
             ColumnLayout {
@@ -1489,7 +1577,7 @@ Item {
 
                     QGCButton {
                         text:       qsTr("- Waypoint")
-                        enabled:    wpCount > 1
+                        enabled:    wpCount > 0
                         onClicked:  wpCount--
                     }
 
@@ -1585,6 +1673,56 @@ Item {
                         // shorter than the queue, otherwise AP_Mission drops the queue and no
                         // photo is taken.
                     }
+                }
+
+                // Başlangıç kapısı ve dalış beklemesi. Boş bırakılırsa App Settings ->
+                // Mission One değerleri (10 / 5 sn) kullanılır.
+                RowLayout {
+                    spacing:            ScreenTools.defaultFontPixelWidth
+                    Layout.fillWidth:   true
+
+                    QGCLabel { text: qsTr("Başlangıç beklemesi (sn)") }
+
+                    QGCTextField {
+                        id:                     startWaitField
+                        Layout.preferredWidth:  _yawWidth
+                        text:                   startWaitText
+                        placeholderText:        _starMissionSettings.startWait.valueString
+                        // The plan opens by holding the point the vehicle was placed on for
+                        // this long, then MAV_CMD_AURA_POSITION_FIX (31015) snaps the
+                        // navigation solution onto the Home coordinate above and the first
+                        // dive begins. 0 removes the hold and the position fix together.
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    QGCLabel { text: qsTr("Dalış beklemesi (sn)") }
+
+                    QGCTextField {
+                        id:                     diveSettleField
+                        Layout.preferredWidth:  _yawWidth
+                        text:                   diveSettleText
+                        placeholderText:        _starMissionSettings.diveSettle.valueString
+                        // Hold on every dive-in-place waypoint, so the travel leg does not
+                        // start while the vehicle is still shallow.
+                    }
+                }
+
+                RowLayout {
+                    spacing:            ScreenTools.defaultFontPixelWidth
+                    Layout.fillWidth:   true
+
+                    QGCCheckBox {
+                        id:         returnHomeCheck
+                        text:       qsTr("Başlangıca dön (son hedeften sonra)")
+                        checked:    returnHome
+                        // Unticked (default): the plan ends on the last stop - the vehicle
+                        // surfaces, takes its photo and stays there. Ticked: dive in place,
+                        // travel back to the Home row's coordinate underwater, surface.
+                        // Always the LAST target, whatever their number.
+                    }
+
+                    Item { Layout.fillWidth: true }
                 }
             }
         }

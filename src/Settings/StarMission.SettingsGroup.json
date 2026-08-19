@@ -57,6 +57,16 @@
     "decimalPlaces": 1
 },
 {
+    "name":         "startWait",
+    "shortDesc":    "Start hold before the position fix",
+    "longDesc":     "How long the vehicle holds the point it was placed on, at the start of the mission, before the navigation solution is snapped onto the plan's start coordinate and the first dive begins. The vehicle is driven onto the start marker by hand, so this is the window in which it stops moving and the estimator settles: snapping while it is still gliding writes that glide straight back into the solution. 0 removes the hold and the position fix together.",
+    "type":         "uint16",
+    "default":      10,
+    "units":        "s",
+    "min":          0,
+    "max":          600
+},
+{
     "name":         "diveSettle",
     "shortDesc":    "Dive settle hold",
     "longDesc":     "Hold on the dive-in-place waypoint. ArduSub declares a waypoint reached within WPNAV_RADIUS in 3D, so a short vertical leg completes while the vehicle is still shallow. This hold keeps the mission on the dive waypoint until it is actually at cruise depth.",

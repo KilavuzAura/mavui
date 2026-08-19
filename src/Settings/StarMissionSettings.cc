@@ -21,6 +21,7 @@ DECLARE_SETTINGSFACT(StarMissionSettings, anchorSettle)
 DECLARE_SETTINGSFACT(StarMissionSettings, anchorGuard)
 DECLARE_SETTINGSFACT(StarMissionSettings, photoBefore)
 DECLARE_SETTINGSFACT(StarMissionSettings, photoWindow)
+DECLARE_SETTINGSFACT(StarMissionSettings, startWait)
 DECLARE_SETTINGSFACT(StarMissionSettings, diveSettle)
 DECLARE_SETTINGSFACT(StarMissionSettings, surfaceSettle)
 
@@ -29,7 +30,8 @@ void StarMissionSettings::resetToDefaults()
     // Going through the accessors makes sure a fact that has not been touched yet
     // is created before it is reset, otherwise its stale QSettings entry survives.
     for (Fact* fact : { anchorRadius(), anchorSettle(), anchorGuard(),
-                        photoBefore(), photoWindow(), diveSettle(), surfaceSettle() }) {
+                        photoBefore(), photoWindow(), startWait(),
+                        diveSettle(), surfaceSettle() }) {
         if (fact->defaultValueAvailable()) {
             fact->setRawValue(fact->rawDefaultValue());
         }

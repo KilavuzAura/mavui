@@ -227,6 +227,21 @@ Item {
         property real topEdgeCenterInset: visible ? y + height : 0
     }
 
+    // AURA: live position fix, same control as the Plan toolbar. Parked under the map
+    // scale because that column is the only one nothing else claims - the tool strip
+    // owns the left edge, both right-hand layouts are stacked, and the bottom belongs
+    // to the virtual joystick.
+    PositionFixControl {
+        id:                 positionFixControl
+        anchors.margins:    _toolsMargin
+        anchors.left:       toolStrip.right
+        anchors.top:        mapScale.visible ? mapScale.bottom : parent.top
+        z:                  QGroundControl.zOrderWidgets
+        showBackground:     true
+        visible:            !QGroundControl.videoManager.fullScreen && !isViewer3DOpen &&
+                            mapControl.pipState.state === mapControl.pipState.fullState
+    }
+
     Loader {
         id: preFlightChecklistLoader
         sourceComponent: preFlightChecklistPopup

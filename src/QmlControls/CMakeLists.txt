@@ -108,6 +108,7 @@ qt_add_qml_module(QGroundControlControlsModule
         PIDTuning.qml
         PipState.qml
         PipView.qml
+        PositionFixControl.qml
         PreFlightCheckButton.qml
         PreFlightCheckGroup.qml
         PreFlightCheckModel.qml

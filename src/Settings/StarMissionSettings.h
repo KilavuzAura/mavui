@@ -27,6 +27,7 @@ public:
     DEFINE_SETTINGFACT(anchorGuard)
     DEFINE_SETTINGFACT(photoBefore)
     DEFINE_SETTINGFACT(photoWindow)
+    DEFINE_SETTINGFACT(startWait)
     DEFINE_SETTINGFACT(diveSettle)
     DEFINE_SETTINGFACT(surfaceSettle)
 

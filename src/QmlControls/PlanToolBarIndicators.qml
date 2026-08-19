@@ -211,6 +211,23 @@ Item {
             }
         }
 
+        // AURA: live position fix. The space to the right of the mission totals was
+        // empty and this is where the operator already is while setting a plan up.
+        // Not part of the plan: it talks to the vehicle straight away.
+        ColumnLayout {
+            spacing:            _rowSpacing
+            Layout.alignment:   Qt.AlignVCenter
+
+            QGCLabel {
+                text:           qsTr("Position Fix")
+                font.pointSize: ScreenTools.smallFontPointSize
+            }
+
+            PositionFixControl {
+                Layout.alignment: Qt.AlignLeft
+            }
+        }
+
         GridLayout {
             columns:                3
             rowSpacing:             _rowSpacing

@@ -216,6 +216,24 @@ Rectangle {
 
                     QGCButton {
                         Layout.fillWidth:   true
+                        text:               qsTr("Fix the location")
+                        // AURA: tells the vehicle it is standing on THIS item's coordinate
+                        // (Vehicle::fixPositionEstimate). Nothing about the plan changes -
+                        // it is the same live correction as the Fix position box in the
+                        // toolbar, sourcing the coordinate from the item instead of the
+                        // operator's keyboard. Needs a connected vehicle.
+                        enabled:            _fixVehicle && missionItem.specifiesCoordinate && missionItem.coordinate.isValid
+
+                        onClicked: {
+                            _fixVehicle.fixPositionEstimate(missionItem.coordinate.latitude, missionItem.coordinate.longitude)
+                            hamburgerMenuDropPanel.close()
+                        }
+
+                        property var _fixVehicle: QGroundControl.multiVehicleManager.activeVehicle
+                    }
+
+                    QGCButton {
+                        Layout.fillWidth:   true
                         text:               qsTr("Edit position...")
                         enabled:            missionItem.specifiesCoordinate
                         onClicked: {

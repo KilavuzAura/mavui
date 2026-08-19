@@ -68,6 +68,9 @@
 #endif
 
 #include <QtCore/QDateTime>
+#include <QtCore/QElapsedTimer>
+
+#include <cmath>
 
 QGC_LOGGING_CATEGORY(VehicleLog, "VehicleLog")
 
@@ -2455,6 +2458,36 @@ void Vehicle::sendMavCommandWithHandler(const MavCmdAckHandlerInfo_t* ackHandler
                           command,
                           MAV_FRAME_GLOBAL,
                           param1, param2, param3, param4, param5, param6, param7);
+}
+
+void Vehicle::fixPositionEstimate(double lat, double lon, double accuracyM)
+{
+    // param1 is the offboard timestamp of the measurement, in seconds. It is a float, so
+    // a Unix epoch value (~1.8e9) would quantise to ~128 s steps and be worthless; the
+    // firmware does not need wall-clock time, only a MONOTONIC offboard clock whose
+    // constant offset from the vehicle clock JitterCorrection can learn. Seconds since
+    // this process started keeps the number small enough for float to hold ~10 ms.
+    // This is worth getting right: NavEKF3_core::setLatLng clamps a stale timestamp to
+    // 5 s old and then advances the fix by velocity * 5 s, so a drifting vehicle would be
+    // snapped several metres away from the point that was actually asked for.
+    static QElapsedTimer offboardClock;
+    if (!offboardClock.isValid()) {
+        offboardClock.start();
+    }
+
+    // The command is refused outright unless z is NaN in a global frame, so it cannot be
+    // sent through the generic sendCommand() path (which zero-fills the parameters).
+    sendMavCommandInt(defaultComponentId(),
+                      MAV_CMD_EXTERNAL_POSITION_ESTIMATE,
+                      MAV_FRAME_GLOBAL,
+                      true,                                                 // show errors
+                      static_cast<float>(offboardClock.elapsed()) / 1000.0f, // param1: timestamp (s)
+                      0,                                                    // param2: processing delay (s)
+                      accuracyM > 0 ? static_cast<float>(accuracyM) : NAN,  // param3: accuracy (m)
+                      0,
+                      lat,                                                  // x
+                      lon,                                                  // y
+                      NAN);                                                 // z: must be NaN
 }
 
 void Vehicle::sendMavCommandInt(int compId, MAV_CMD command, MAV_FRAME frame, bool showError, float param1, float param2, float param3, float param4, double param5, double param6, float param7)
