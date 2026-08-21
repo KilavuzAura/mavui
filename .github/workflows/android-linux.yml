@@ -31,6 +31,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Bilinen iyi sure ~37 dk (Build adimi, iki ABI). CPM/FetchContent'in
+    # indirmelerinde zaman asimi yok: codeload takilirsa is 6 saatlik
+    # varsayilan sinira kadar asili kaliyor (21 Agu: 47 dk sonra hala Build).
+    # 75 dk'da kes, hata hemen gorunsun.
+    timeout-minutes: 75
 
     strategy:
       matrix:
