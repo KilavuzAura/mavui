@@ -1,0 +1,15 @@
+// Windows resource script for MavUI.
+//
+// This file is compiled into the executable (CMakeLists.txt copies every entry of
+// DEPLOY_WIN_FILES into ${CMAKE_BINARY_DIR}/deploy/windows and adds them to the target
+// sources), so the icon path is relative to that copy directory - NOT to this file.
+// QGC_WINDOWS_ICON_PATH is copied there too, under its own basename, which is why the
+// name below has to match custom/deploy/windows/MavUI.ico exactly. The upstream file
+// this replaces pointed at "./WindowsQGC.ico" and only ever showed the AURA icon by the
+// accident of the custom icon carrying the same filename as the stock one.
+//
+// VERSIONINFO is deliberately absent: Qt generates its own resource from the
+// QT_TARGET_* properties set in CMakeLists.txt (company, product, copyright, version),
+// and declaring it twice makes the resource compiler fail.
+
+IDI_ICON1    ICON    DISCARDABLE     "./MavUI.ico"

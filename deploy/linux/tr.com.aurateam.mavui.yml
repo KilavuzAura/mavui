@@ -1,9 +1,9 @@
-app-id: org.mavlink.qgroundcontrol
+app-id: tr.com.aurateam.mavui
 runtime: org.gnome.Platform
 runtime-version: 47
 sdk: org.gnome.Sdk
-command: QGroundControl
-rename-appdata-file: org.mavlink.qgroundcontrol.metainfo.xml
+command: MavUI
+rename-appdata-file: tr.com.aurateam.mavui.metainfo.xml
 
 finish-args:
   - --socket=wayland
@@ -18,10 +18,10 @@ finish-args:
   - --filesystem=/run/udev:ro # enables firmware upload & auto connecting
 
 modules:
-  - name: QGroundControl
+  - name: MavUI
     sources:
       - type: git
-        url: https://github.com/mavlink/qgroundcontrol.git
+        url: https://github.com/KilavuzAura/mavui.git
         tag: master
         commit: 35f7efd36e0d14e39378cc3acdbcb003b8c57921
     buildsystem: cmake-ninja

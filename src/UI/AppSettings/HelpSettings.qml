@@ -54,13 +54,6 @@ Rectangle {
                 text:               "<a href=\"https://discuss.ardupilot.org/c/ground-control-software/qgroundcontrol\">https://discuss.ardupilot.org/c/ground-control-software/qgroundcontrol</a>"
                 onLinkActivated:    (link) => Qt.openUrlExternally(link)
             }
-
-            QGCLabel { text: qsTr("QGroundControl Discord Channel") }
-            QGCLabel {
-                linkColor:          qgcPal.text
-                text:               "<a href=\"https://discord.com/channels/1022170275984457759/1022185820683255908\">https://discord.com/channels/1022170275984457759/1022185820683255908</a>"
-                onLinkActivated:    (link) => Qt.openUrlExternally(link)
-            }
         }
     }
 }

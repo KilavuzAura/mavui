@@ -37,11 +37,12 @@
         <file alias="pencil.svg">resources/pencil.svg</file>
         <file alias="Play.svg">resources/Play.svg</file>
         <file alias="PowerButton.svg">resources/PowerButton.svg</file>
-        <file alias="QGCLogoBlack.svg">resources/QGCLogoBlack.svg</file>
-        <file alias="QGCLogoFull.svg">resources/QGCLogoFull.svg</file>
-        <file alias="QGCLogoWhite.svg">resources/QGCLogoWhite.svg</file>
+        <!-- QGCLogoBlack/Full/White and QGroundControlConnect removed: the branded
+             logo comes from custom/custom.qrc, which registers the same /res aliases.
+             Two .qrc files claiming one path leaves the winner up to link order, so the
+             stock entries are gone rather than merely shadowed. QGCLogoArrow is an arrow
+             head, not a logo, and stays. -->
         <file alias="QGCLogoArrow.svg">resources/QGCLogoArrow.svg</file>
-        <file alias="QGroundControlConnect.svg">resources/QGroundControlConnect.svg</file>
         <file alias="rtl.svg">resources/rtl.svg</file>
         <file alias="SplashScreen">resources/SplashScreen.png</file>
         <file alias="Stop.svg">resources/Stop.svg</file>
@@ -60,7 +61,7 @@
         <file alias="Gripper.svg">resources/Gripper.svg</file>
         <file alias="GripperRelease.svg">resources/GripperRelease.svg</file>
         <file alias="GripperGrab.svg">resources/GripperGrab.svg</file>
-        <file alias="qgroundcontrol.ico">resources/icons/qgroundcontrol.ico</file>
+        <!-- qgroundcontrol.ico: same story, custom/custom.qrc supplies /res/qgroundcontrol.ico -->
     </qresource>
     <qresource prefix="/res/firmware">
         <file alias="3drradio.png">resources/firmware/3drradio.png</file>

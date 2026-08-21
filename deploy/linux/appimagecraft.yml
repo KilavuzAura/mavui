@@ -1,7 +1,7 @@
 version: 1
 
 project:
-  name: QGroundControl
+  name: MavUI
   version: Daily
 
 build:

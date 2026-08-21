@@ -11,6 +11,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: bilelmoussaoui/flatpak-github-actions/flatpak-builder@v6
         with:
-          bundle: org.mavlink.qgroundcontrol.flatpak
-          manifest-path: ./deploy/flatpak/org.mavlink.qgroundcontrol.yml
+          bundle: tr.com.aurateam.mavui.flatpak
+          manifest-path: ./deploy/linux/tr.com.aurateam.mavui.yml
           cache-key: flatpak-builder-${{ github.sha }}

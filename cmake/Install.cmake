@@ -36,13 +36,17 @@ if(ANDROID)
     # get_target_property(QGC_ANDROID_DEPLOY_FILE ${CMAKE_PROJECT_NAME} QT_ANDROID_DEPLOYMENT_SETTINGS_FILE)
     # cmake_print_variables(QGC_ANDROID_DEPLOY_FILE)
 elseif(LINUX)
+    # Masaustu girdisinin adi UYGULAMA adi olmali: QGCApplication.cc setDesktopFileName()
+    # ile kendini "${QGC_APP_NAME}" diye tanitir, pencere yoneticisi de pencereyi bu ada
+    # gore .desktop dosyasiyla eslestirir. Sabit org.mavlink.qgroundcontrol.desktop hem
+    # yanlis marka hem de eslesmeyen bir addi.
     configure_file(
-        ${CMAKE_SOURCE_DIR}/deploy/linux/org.mavlink.qgroundcontrol.desktop.in
-        ${CMAKE_BINARY_DIR}/org.mavlink.qgroundcontrol.desktop
+        ${CMAKE_SOURCE_DIR}/deploy/linux/app.desktop.in
+        ${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}.desktop
         @ONLY
     )
     install(
-        FILES ${CMAKE_BINARY_DIR}/org.mavlink.qgroundcontrol.desktop
+        FILES ${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}.desktop
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
     )
     install(
@@ -50,13 +54,15 @@ elseif(LINUX)
         DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/128x128/apps/
         RENAME ${CMAKE_PROJECT_NAME}.png
     )
+    # AppStream metainfo dosyasinin adi <id> ile birebir ayni olmak zorunda; <id> de
+    # QGC_PACKAGE_NAME'den geliyor (tr.com.aurateam.mavui).
     configure_file(
-        ${CMAKE_SOURCE_DIR}/deploy/linux/org.mavlink.qgroundcontrol.metainfo.xml.in
-        ${CMAKE_BINARY_DIR}/metainfo/org.mavlink.qgroundcontrol.metainfo.xml
+        ${CMAKE_SOURCE_DIR}/deploy/linux/app.metainfo.xml.in
+        ${CMAKE_BINARY_DIR}/metainfo/${QGC_PACKAGE_NAME}.metainfo.xml
         @ONLY
     )
     install(
-        FILES ${CMAKE_BINARY_DIR}/metainfo/org.mavlink.qgroundcontrol.metainfo.xml
+        FILES ${CMAKE_BINARY_DIR}/metainfo/${QGC_PACKAGE_NAME}.metainfo.xml
         DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo/
     )
     # AppRun ve AppImage betigi calistirilabilirin adini bilmeli; install script'i

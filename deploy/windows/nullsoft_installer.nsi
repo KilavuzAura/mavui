@@ -93,11 +93,14 @@ doInstall:
   WriteRegStr HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}" "UninstallString" "$\"$INSTDIR\${EXENAME}-Uninstall.exe$\""
   WriteRegDWORD HKLM "SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\${EXENAME}.exe" "DumpCount" 5
   WriteRegDWORD HKLM "SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\${EXENAME}.exe" "DumpType" 1
-  WriteRegExpandStr HKLM "SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\${EXENAME}.exe" "DumpFolder" "%LOCALAPPDATA%\QGCCrashDumps"
+  WriteRegExpandStr HKLM "SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\${EXENAME}.exe" "DumpFolder" "%LOCALAPPDATA%\${APPNAME}CrashDumps"
 
-  ; QGC stores its own driver version key to prevent installation if already up to date
+  ; The app stores its own driver version key to prevent installation if already up to date
   ; This prevents running the driver install a second time which will start up in repair mode which is confusing
-  !define QGCDRIVERVERSIONKEY "SOFTWARE\QGroundControlUAVDrivers"
+  ; Named after ORGNAME so a custom build keeps its own state instead of writing (and
+  ; deleting) QGroundControl's key. A machine that already has the drivers from a stock
+  ; QGC install runs driver.msi once more on the first install of this build.
+  !define QGCDRIVERVERSIONKEY "SOFTWARE\${ORGNAME}UAVDrivers"
   !define QGCCURRENTDRIVERVERSION 3
 
   ; If the drivers are already installed the key "HKCU/SOFTWARE\MichaelOborne\driver\installed" will be present and set to 1
@@ -120,7 +123,7 @@ driversOutOfDate:
 driversNotInstalled:
   DetailPrint "UAV Drivers not installed."
   ; Delete abandoned possibly out of date version key
-  DeleteRegKey HKCU "SOFTWARE\QGroundControlUAVDrivers"
+  DeleteRegKey HKCU "${QGCDRIVERVERSIONKEY}"
 
 installDrivers:
   DetailPrint "Installing UAV Drivers..."

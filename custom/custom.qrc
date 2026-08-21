@@ -5,11 +5,18 @@
     <qresource prefix="/Custom/qmlimages">
         <file alias="PaperPlane.svg">res/Images/CustomVehicleIcon.svg</file>
     </qresource>
-    <qresource prefix="/Custom/res">
+    <!-- Prefix /res, NOT /Custom/res. Nothing in the application ever reads
+         /Custom/res - the toolbar, the settings pages and the GCS marker all ask for
+         "/res/QGCLogo*", so a block under /Custom/res was dead and the stock QGroundControl
+         logo was what actually showed on screen. The matching entries were removed from
+         qgcresources.qrc so these are the only ones claiming the path.
+         The alias names keep the upstream spelling because they ARE the paths the
+         application asks for; only what they point at is ours. -->
+    <qresource prefix="/res">
         <file alias="QGCLogoFull.svg">res/AuraLogo.svg</file>
         <file alias="QGCLogoWhite.svg">res/AuraLogo.svg</file>
         <file alias="QGCLogoWhite">res/AuraLogo.svg</file>
         <file alias="QGCLogoBlack.svg">res/AuraLogo.svg</file>
-        <file alias="qgroundcontrol.ico">res/icons/custom_qgroundcontrol.ico</file>
+        <file alias="qgroundcontrol.ico">res/icons/MavUI.ico</file>
     </qresource>
 </RCC>
