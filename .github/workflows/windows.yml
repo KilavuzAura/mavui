@@ -75,9 +75,34 @@ jobs:
         with:
           version: ${{ env.GST_VERSION }}
 
+      # community.chocolatey.org zaman zaman 503/504 donuyor VE bu yolda choco
+      # exit 0 ile cikiyor ("Chocolatey installed 0/0 packages"): adim yesil
+      # gorunuyor, hata 55 dakika sonra `cmake --install` icinde
+      # "Could not find QGC_NSIS_INSTALLER_CMD ... makensis" diye patliyordu
+      # (21 Agu, kosu 32465660925). Uc kez dene, olmazsa kurulumu dogrudan indir,
+      # sonunda makensis'i DOGRULA ve dizini PATH'e ekle -- choco is sirasinda
+      # makine PATH'ini degistirse bile sonraki adimlar onu gormez.
       - name: Install NSIS
-        run: choco install nsis -y
-        shell: powershell
+        shell: pwsh
+        run: |
+          $nsisDir = "${env:ProgramFiles(x86)}\NSIS"
+          for ($i = 1; $i -le 3; $i++) {
+            choco install nsis -y --no-progress
+            if (Test-Path "$nsisDir\makensis.exe") { break }
+            Write-Host "NSIS kurulamadi (deneme $i), tekrar denenecek..."
+            Start-Sleep -Seconds 20
+          }
+          if (-not (Test-Path "$nsisDir\makensis.exe")) {
+            Write-Host "Chocolatey olmadi, kurulum dogrudan indiriliyor."
+            $url = "https://sourceforge.net/projects/nsis/files/NSIS%203/3.10/nsis-3.10-setup.exe/download"
+            Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\nsis-setup.exe" -UserAgent "Mozilla/5.0"
+            Start-Process -FilePath "$env:RUNNER_TEMP\nsis-setup.exe" -ArgumentList "/S" -Wait
+          }
+          if (-not (Test-Path "$nsisDir\makensis.exe")) {
+            throw "makensis kurulamadi: $nsisDir"
+          }
+          & "$nsisDir\makensis.exe" /VERSION
+          $nsisDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Setup Caching
         uses: ./.github/actions/cache
