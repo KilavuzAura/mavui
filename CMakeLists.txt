@@ -478,9 +478,14 @@ elseif(ANDROID)
 
     list(APPEND QT_ANDROID_MULTI_ABI_FORWARD_VARS QGC_STABLE_BUILD QT_HOST_PATH)
 
+    # Belirli bir commit'e sabitli: refs/heads/master.zip arsivini codeload her
+    # istekte yeniden uretiyor, 21 Agu'da 504 dondu ve Android derlemesi
+    # ninja'yi durdurdu. Commit arsivi statik, CPM onbellegi de artik ayni
+    # anahtarda kaliyor (master her degistiginde yeniden indirilmiyor).
+    # b71f147 = master, 26 Oca 2026.
     CPMAddPackage(
         NAME android_openssl
-        URL https://github.com/KDAB/android_openssl/archive/refs/heads/master.zip
+        URL https://github.com/KDAB/android_openssl/archive/b71f1470962019bd89534a2919f5925f93bc5779.zip
     )
     include(${android_openssl_SOURCE_DIR}/android_openssl.cmake)
     add_android_openssl_libraries(${CMAKE_PROJECT_NAME})
