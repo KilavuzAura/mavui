@@ -50,6 +50,12 @@ jobs:
       QT_ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS || 'mavui' }}
       QT_ANDROID_KEYSTORE_STORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       QT_ANDROID_KEYSTORE_KEY_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      # secrets baglami if: icinde OKUNAMAZ (yalniz env/with/run). Dogrudan
+      # "if: secrets.X != ''" yazmak dosyayi ayristirilamaz yapiyor: is hic
+      # baslamiyor, kosu 0 sn'de "workflow file issue" ile dusuyordu. Sirri
+      # env'e kopyalayip kosullari env uzerinden kuruyoruz.
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       QT_ANDROID_ABIS: ${{ matrix.BuildType == 'Release' && 'armeabi-v7a;arm64-v8a' || 'arm64-v8a' }}
 
     steps:
@@ -77,8 +83,8 @@ jobs:
           large-packages: false
 
       - name: Prepare signing keystore
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' }}
-        run: echo '${{ secrets.ANDROID_KEYSTORE_BASE64 }}' | base64 -d > "${{ env.QT_ANDROID_KEYSTORE_PATH }}"
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_KEYSTORE_PASSWORD != '' }}
+        run: printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$QT_ANDROID_KEYSTORE_PATH"
 
       - name: Install Qt for Android
         uses: ./.github/actions/qt-android
@@ -97,7 +103,7 @@ jobs:
               -DQT_ANDROID_ABIS="${{ env.QT_ANDROID_ABIS }}"
               -DQT_ANDROID_BUILD_ALL_ABIS=OFF
               -DQT_HOST_PATH="${{ env.QT_ROOT_DIR }}/../gcc_64"
-              -DQT_ANDROID_SIGN_APK=${{ (secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '') && 'ON' || 'OFF' }}
+              -DQT_ANDROID_SIGN_APK=${{ (env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_KEYSTORE_PASSWORD != '') && 'ON' || 'OFF' }}
               -DQT_DEBUG_FIND_PACKAGE=ON
               -DQGC_STABLE_BUILD=${{ github.ref_type == 'tag' || contains(github.ref, 'Stable') && 'ON' || 'OFF' }}
 
