@@ -35,16 +35,23 @@ endif()
 #     execute_process(COMMAND chmod a+x "${LD_GSTPLUGIN_PATH}")
 # endif()
 
-# Calistirilabilirin adi proje adindan gelir (custom overlay'de MavUI); sabit
-# QGroundControl yazilirsa markali derlemede linuxdeploy dosyayi bulamaz.
+# Hem calistirilabilirin hem masaustu girdisinin adi proje adindan gelir
+# (custom overlay'de MavUI): Install.cmake .desktop dosyasini ${CMAKE_PROJECT_NAME}
+# adiyla kuruyor, cunku pencere yoneticisi pencereyi setDesktopFileName() ile
+# eslestiriyor. Burada sabit bir ad yazmak markali derlemede linuxdeploy'un
+# dosyayi bulamamasina yol aciyordu.
+# COMMAND_ERROR_IS_FATAL: ikisi de hatayi yalnizca stderr'e yazip 0 ile cikiyor;
+# kontrolsuz birakilinca AppImage hic uretilmeden adim yesil gorunuyor, hata
+# bir sonraki adimda "AppImage: not found" diye ortaya cikiyordu.
 execute_process(COMMAND ${LD_PATH}
     --appdir ${APPDIR_PATH}
     --executable ${APPDIR_PATH}/usr/bin/${CMAKE_PROJECT_NAME}
-    --desktop-file ${APPDIR_PATH}/usr/share/applications/org.mavlink.qgroundcontrol.desktop
-    --custom-apprun ${CMAKE_BINARY_DIR}/AppRun)
+    --desktop-file ${APPDIR_PATH}/usr/share/applications/${CMAKE_PROJECT_NAME}.desktop
+    --custom-apprun ${CMAKE_BINARY_DIR}/AppRun
+    COMMAND_ERROR_IS_FATAL ANY)
 # --exclude-library "libgst*"
 # --plugin qt --plugin gtk --plugin gstreamer
 
 set(ENV{ARCH} x86_64)
 # set(ENV{VERSION} 5.0)
-execute_process(COMMAND ${APPIMAGETOOL_PATH} ${APPDIR_PATH})
+execute_process(COMMAND ${APPIMAGETOOL_PATH} ${APPDIR_PATH} COMMAND_ERROR_IS_FATAL ANY)

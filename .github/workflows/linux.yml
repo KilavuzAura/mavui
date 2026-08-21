@@ -18,8 +18,10 @@ on:
     branches:
       - master
       - 'Stable*'
-    tags:
-      - 'v*'
+    # Tag push'unda bu workflow AYRI bir kosu olarak calismaz: v* tag'i
+    # release.yml'i tetikliyor, o da bu dosyayi workflow_call ile cagiriyor.
+    # Ikisi de tetiklenirse ayni is iki kez derleniyordu (21 Agu: tek tag
+    # 11 kosu acti).
     paths-ignore:
       - 'docs/**' # Do not trigger for any changes under docs
   pull_request:

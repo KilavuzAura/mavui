@@ -5,8 +5,9 @@ on:
     branches:
       - master
       - 'Stable*'
-    tags:
-      - 'v*'
+    # Tag push'unda calismaz: v* tag'i release.yml'i tetikler, surumluk
+    # ciktilar oradan gelir. Ikisi de tetiklenince ayni is iki kez
+    # derleniyordu (21 Agu: tek tag 11 kosu acti).
   pull_request:
     paths:
       - '.github/workflows/custom.yml'
