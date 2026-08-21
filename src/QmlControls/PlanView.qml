@@ -280,6 +280,12 @@ Item {
         // the user had just clicked them, so the map, the Table, Undo and Finish all
         // work unchanged - and reopening the mode on a plan no longer means retyping it.
         var recovered = _planMasterController.containsItems ? creator.extractTargets() : []
+        // The stops are only half of the plan. Depth, the holds, the start gate and the
+        // three checkboxes were typed into the banner and then written into the plan, so
+        // they have to come back out of it too - otherwise reopening the mode showed
+        // blank boxes, Finish read those blanks as "use the default" and the plan came
+        // back at -1 m with a 10 s gate it never had. Read before removeAll() destroys it.
+        var recoveredSettings = _planMasterController.containsItems ? creator.extractSettings() : null
         // The start point comes from the PLAN, not from the Launch marker. Launch is
         // whatever sat at seq 0 of the load, and a plan downloaded from the vehicle
         // carries the vehicle's own home there - where it armed, not where the plan
@@ -301,6 +307,51 @@ Item {
         // but the user can now switch it off to pan or select without placing.
         addWaypointRallyPointAction.checked = true
         _starMissionRestore(start, recovered)
+        _starMissionApplySettings(recoveredSettings, recovered)
+    }
+
+    // Formats a recovered number for a text box: no trailing zeros, so -3.0 shows as
+    // "-3" and 1.5 as "1.5" - the same thing the operator would have typed.
+    function _starMissionText(value) {
+        return String(Math.round(value * 100) / 100)
+    }
+
+    // Puts the tuning recovered from an existing plan back into the banner boxes. Called
+    // with null (or an unreadable plan) it leaves everything alone: a blank sheet keeps
+    // whatever the operator last typed, which is what the boxes are for.
+    function _starMissionApplySettings(settings, targets) {
+        if (!settings || !settings.valid) {
+            return
+        }
+        starMissionAutoDepthCheck.checked = settings.autoDepth
+        if (settings.autoDepth) {
+            starMissionBottomField.text = _starMissionText(settings.bottomClearance)
+        } else {
+            starMissionDepthField.text  = _starMissionText(settings.cruiseDepth)
+        }
+        starMissionDiveSettleField.text     = _starMissionText(settings.diveSettle)
+        starMissionStartWaitField.text      = _starMissionText(settings.startWait)
+        starMissionStartAnchorCheck.checked = settings.startAnchor
+        starMissionReturnHomeCheck.checked  = settings.returnHome
+        // -1 means the plan does not carry the value in a form that can be inverted;
+        // leave the box as it is rather than write a wrong number into it.
+        if (settings.photoBefore >= 0) {
+            starMissionPhotoBeforeField.text = _starMissionText(settings.photoBefore)
+        }
+        if (settings.photoWindow >= 0) {
+            starMissionPhotoWindowField.text = _starMissionText(settings.photoWindow)
+        }
+        // The banner "Anchor" box is the default for targets placed from now on, so it
+        // only makes sense to tick it when every recovered stop is anchored. A mixed plan
+        // keeps its per-target flags either way - those travel in _starMissionSeed.
+        var allAnchored = targets.length > 0
+        for (var i = 0; i < targets.length; i++) {
+            if (!targets[i].anchor) {
+                allAnchored = false
+                break
+            }
+        }
+        starMissionAnchorCheck.checked = allAnchored
     }
 
     // Puts targets recovered from an existing plan back on the map as ordinary placed

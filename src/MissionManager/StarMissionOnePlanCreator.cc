@@ -261,19 +261,41 @@ void StarMissionOnePlanCreator::createFullPlan(const QGeoCoordinate&  home,
     double prevLon = home.longitude();
     bool   first   = true;
 
-    // 0) Start gate: hold the start point, then tell the EKF where that point is.
-    //    The vehicle is driven onto the start marker by hand, so the mission opens by
-    //    holding whatever point it was left on - an anchor, because it locks where the
-    //    vehicle IS. A waypoint would first fly to where the drifted solution thinks
-    //    the start is, which is the error this gate exists to remove.
-    //    MAV_CMD_AURA_POSITION_FIX then snaps the solution onto the coordinate of the
-    //    NEXT nav item that stores a Location - the dive in place emitted right below,
-    //    which carries the start coordinate. Order matters: the fix has to come after
-    //    the hold, because snapping while the vehicle is still gliding writes that
-    //    glide back into the solution it was meant to clean up.
+    // 0) Start gate: fix, then - if a hold was asked for - hold and fix again.
+    //    The vehicle is driven onto the start marker by hand, and the hold is an anchor
+    //    rather than a waypoint because an anchor locks where the vehicle IS - a waypoint
+    //    would first fly to where the drifted solution thinks the start is, which is the
+    //    error this gate exists to remove.
+    //    The FIRST MAV_CMD_AURA_POSITION_FIX runs before the hold. Measured on the
+    //    vehicle (20 Aug, 00000458 t=326 and 00000457 t=387): the solution was ~20 m off
+    //    when AUTO was engaged, so an anchor running first held - and its settle gate
+    //    certified - a point 20 m away from the one the plan calls the start, and the
+    //    correction only landed once the hold was over. The gate exists to prove the
+    //    vehicle is holding the START, so the correction has to come first. It also puts
+    //    the fix on mission item 1, where the operator can re-apply it from the GCS with
+    //    "set current item" while still in MANUAL and watch the map snap before
+    //    committing to AUTO (seen at t=617.8 and t=700.2 in the same log).
+    //    The SECOND fix is the one that has to come after: snapping while the vehicle is
+    //    still gliding writes that glide back into the solution, and the hold is exactly
+    //    the window in which the glide stops.
+    //    Both read the coordinate of the next nav item that stores a Location - the dive
+    //    in place emitted right below, which carries the start coordinate. The anchor
+    //    between them carries none and is stepped over (Sub::do_position_fix walks
+    //    forward past location-less nav commands). On firmware without that walk the
+    //    LEADING fix is skipped with "no waypoint after it" and the gate degrades to the
+    //    old hold-then-fix - which is why hand-edited plans put a dummy waypoint there,
+    //    with a positive altitude so ArduSub would reject it, purely to carry the
+    //    coordinate. Nothing else depends on it, so no dummy is emitted here.
     //    Firmware note: the fix is only accepted while dead reckoning. With a GPS-class
     //    source still fusing (UGPS, GPS_INPUT, SITL's fake GPS) it is rejected, says so
     //    over STATUSTEXT, and the mission carries on unchanged.
+    //    The LEADING fix is emitted whatever the hold is, zero included. Snapping the
+    //    solution onto the start coordinate is worth doing on its own - it is the whole
+    //    reason the operator was asked to drive onto the marker - and a plan with no
+    //    hold is exactly the plan that gets no other chance to correct before the first
+    //    dive. What 0 drops is the hold and, with it, the trailing fix: with no hold
+    //    there is no glide-stopping window for a second snap to sit at the end of.
+    b.command(kCmdAuraPositionFix, QJsonArray({ kPositionFixDwell, 0, 0, 0, 0, 0, 0 }));
     if (startWaitS > 0) {
         b.command(kCmdAuraAnchor, QJsonArray({ startWaitS, tuning.anchorRadius,
                                                tuning.anchorSettle, tuning.anchorGuard,
@@ -483,6 +505,128 @@ QGeoCoordinate StarMissionOnePlanCreator::extractStart() const
         }
     }
     return QGeoCoordinate();
+}
+
+QVariantMap StarMissionOnePlanCreator::extractSettings() const
+{
+    QVariantMap out;
+    out[QStringLiteral("valid")] = false;
+
+    MissionController* missionController = _planMasterController ? _planMasterController->missionController() : nullptr;
+    QmlObjectListModel* items = missionController ? missionController->visualItems() : nullptr;
+    if (!items) {
+        return out;
+    }
+    const int count = items->count();
+
+    // 1) Start gate. Index 0 is the mission settings item; everything between it and the
+    //    first coordinate item is the gate (position fix, anchor, position fix - the
+    //    leading fix is always there, the other two only when a hold was asked for). The
+    //    anchor's duration IS the start hold. No anchor there means the hold was switched
+    //    off, and 0 has to be reported as 0 - reporting "unknown" would let the blank box
+    //    fall back to the App Settings default and put a hold back into a plan that
+    //    deliberately had none.
+    int startWait = 0;
+    int firstCoordIndex = -1;
+    for (int i = 1; i < count; i++) {
+        SimpleMissionItem* it = qobject_cast<SimpleMissionItem*>(items->get(i));
+        if (!it) {
+            break;
+        }
+        if (it->specifiesCoordinate() && it->coordinate().isValid()) {
+            firstCoordIndex = i;
+            break;
+        }
+        if (it->command() == kCmdAuraAnchor) {
+            startWait = static_cast<int>(std::lround(it->missionItem().param1()));
+        }
+    }
+    if (firstCoordIndex < 0) {
+        return out;     // no coordinate item at all - not a plan this creator wrote
+    }
+
+    // 2) The first coordinate item is the dive in place that opens the pattern, so it
+    //    carries both the cruise depth (or the bottom clearance in terrain frame) and
+    //    the dive hold.
+    SimpleMissionItem* dive = qobject_cast<SimpleMissionItem*>(items->get(firstCoordIndex));
+    const bool   autoDepth  = dive->missionItem().frame() == kFrameGlobalTerrainAlt;
+    const double diveAlt    = dive->altitude()->rawValue().toDouble();
+    const int    diveSettle = static_cast<int>(std::lround(dive->missionItem().param1()));
+
+    // 3) Start anchor: the departure gate sits between the dive in place and the first
+    //    travel leg, so it is an anchor before the next coordinate item.
+    bool startAnchor = false;
+    for (int j = firstCoordIndex + 1; j < count; j++) {
+        SimpleMissionItem* it = qobject_cast<SimpleMissionItem*>(items->get(j));
+        if (!it || (it->specifiesCoordinate() && it->coordinate().isValid())) {
+            break;
+        }
+        if (it->command() == kCmdAuraAnchor) {
+            startAnchor = true;
+            break;
+        }
+    }
+
+    // 4) Photo timing, from the FIRST stop. Every stop is written with the same numbers,
+    //    so one is enough and the first one cannot be the closing waypoint of a return
+    //    leg. Anchored: the surface anchor carries the window (param1) and the
+    //    pre-shutter wait (param7) verbatim. Unanchored: only the CONDITION_DELAY is
+    //    recoverable - see the header for why the window is not.
+    int photoBefore = -1;
+    int photoWindow = -1;
+    for (int k = 1; k < count; k++) {
+        SimpleMissionItem* wp = qobject_cast<SimpleMissionItem*>(items->get(k));
+        if (!wp || !isSurfaceWaypoint(wp)) {
+            continue;
+        }
+        for (int j = k + 1; j < count; j++) {
+            SimpleMissionItem* it = qobject_cast<SimpleMissionItem*>(items->get(j));
+            if (!it) {
+                break;
+            }
+            const int cmd = it->command();
+            if (cmd == kCmdAuraAnchor) {
+                photoWindow = static_cast<int>(std::lround(it->missionItem().param1()));
+                photoBefore = static_cast<int>(std::lround(it->missionItem().param7()));
+                break;
+            }
+            if (cmd == kCmdConditionDelay) {
+                photoBefore = static_cast<int>(std::lround(it->missionItem().param1()));
+                continue;
+            }
+            if (cmd == kCmdConditionYaw || cmd == kCmdDoDigicamControl) {
+                continue;
+            }
+            break;
+        }
+        break;
+    }
+
+    // 5) Return leg: the plan closes with a surface waypoint back on the start point.
+    //    Compared against extractStart(), not plannedHomePosition - see extractStart()
+    //    for why the Launch marker cannot be trusted here.
+    bool returnHome = false;
+    const QGeoCoordinate start = extractStart();
+    for (int k = count - 1; k >= 1; k--) {
+        SimpleMissionItem* it = qobject_cast<SimpleMissionItem*>(items->get(k));
+        if (!it || !it->specifiesCoordinate() || !it->coordinate().isValid()) {
+            continue;
+        }
+        returnHome = isSurfaceWaypoint(it) && start.isValid() && it->coordinate().distanceTo(start) < 1.0;
+        break;
+    }
+
+    out[QStringLiteral("valid")]           = true;
+    out[QStringLiteral("autoDepth")]       = autoDepth;
+    out[QStringLiteral("cruiseDepth")]     = autoDepth ? kDefaultCruiseDepth : diveAlt;
+    out[QStringLiteral("bottomClearance")] = autoDepth ? diveAlt : kDefaultBottomClearance;
+    out[QStringLiteral("diveSettle")]      = diveSettle;
+    out[QStringLiteral("startWait")]       = startWait;
+    out[QStringLiteral("startAnchor")]     = startAnchor;
+    out[QStringLiteral("returnHome")]      = returnHome;
+    out[QStringLiteral("photoBefore")]     = photoBefore;
+    out[QStringLiteral("photoWindow")]     = photoWindow;
+    return out;
 }
 
 QVariantList StarMissionOnePlanCreator::extractTargets() const

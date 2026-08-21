@@ -59,7 +59,7 @@
 {
     "name":         "startWait",
     "shortDesc":    "Start hold before the position fix",
-    "longDesc":     "How long the vehicle holds the point it was placed on, at the start of the mission, before the navigation solution is snapped onto the plan's start coordinate and the first dive begins. The vehicle is driven onto the start marker by hand, so this is the window in which it stops moving and the estimator settles: snapping while it is still gliding writes that glide straight back into the solution. 0 removes the hold and the position fix together.",
+    "longDesc":     "How long the vehicle holds the point it was placed on, at the start of the mission, before the first dive begins. The hold is wrapped in two position fixes onto the plan's start coordinate: the one BEFORE it means the hold is performed - and certified by its settle gate - on a corrected solution instead of a drifted one, and it sits on mission item 1 so it can be re-applied from the GCS before AUTO. The one AFTER it exists because the vehicle is driven onto the start marker by hand: this is the window in which it stops moving and the estimator settles, and snapping while it is still gliding writes that glide straight back into the solution. 0 removes the hold and the fix that follows it; the fix BEFORE it is written into every plan, because snapping onto the start coordinate is worth doing whether or not the vehicle waits there.",
     "type":         "uint16",
     "default":      10,
     "units":        "s",

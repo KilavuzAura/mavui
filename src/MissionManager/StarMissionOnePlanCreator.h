@@ -12,6 +12,7 @@
 #include "PlanCreator.h"
 
 #include <QtCore/QVariantList>
+#include <QtCore/QVariantMap>
 #include <QtPositioning/QGeoCoordinate>
 
 #include <limits>
@@ -53,9 +54,12 @@ public:
     ///     startAnchor         drop anchor once at the start point, right after the dive in place and
     ///                         before the first travel leg. Duration 0: the settle gate alone decides,
     ///                         so the mission departs from a point the vehicle has actually held.
-    ///     startWait           hold on the start point BEFORE the first dive (s), followed by a
-    ///                         MAV_CMD_AURA_POSITION_FIX that snaps the navigation solution onto the
-    ///                         start coordinate. 0 emits neither. NaN falls back to
+    ///     startWait           hold on the start point BEFORE the first dive (s), wrapped in two
+    ///                         MAV_CMD_AURA_POSITION_FIX items that snap the navigation solution
+    ///                         onto the start coordinate: one before, so the hold happens on a
+    ///                         corrected solution, one after, so the glide the hold stopped is not
+    ///                         written back in. 0 drops the hold and the trailing fix; the leading
+    ///                         fix is emitted either way. NaN falls back to
     ///                         StarMissionSettings::startWait.
     ///     diveSettle          hold on every dive-in-place waypoint (s). NaN falls back to
     ///                         StarMissionSettings::diveSettle.
@@ -89,6 +93,26 @@ public:
     /// Returns an empty list when the loaded plan does not look like one of ours, which
     /// is the caller's signal that replacing it would lose work.
     Q_INVOKABLE QVariantList extractTargets() const;
+
+    /// Reads the plan's own tuning back out of it, in the shape the UI boxes take:
+    ///     { "valid": bool,              // false = not one of our plans, leave the boxes alone
+    ///       "autoDepth": bool, "cruiseDepth": double, "bottomClearance": double,
+    ///       "diveSettle": int, "startWait": int, "startAnchor": bool, "returnHome": bool,
+    ///       "photoBefore": int,         // -1 = not recoverable from this plan
+    ///       "photoWindow": int }        // -1 = not recoverable (unanchored plans, see below)
+    /// extractTargets() recovers the stops; this recovers everything else the operator
+    /// typed, so reopening the placement mode on an existing plan no longer quietly
+    /// resets it. Without this a plan cruising at -3 m came back with a blank Depth box,
+    /// and Finish rewrote it at the -1 m default - the plan changed and nothing said so.
+    /// Two values are deliberately absent:
+    ///     surfaceClearance - it is a clamp applied to the cruise depth, never stored in
+    ///         the plan, so there is nothing to read back.
+    ///     photoWindow on an UNANCHORED stop - the emitted hold is
+    ///         max(window, photoBefore + turn budget + 1), so a window smaller than the
+    ///         budget cannot be recovered from it. Reading the padded hold back would
+    ///         inflate the box on every reopen (5 -> 24 -> 45), so it returns -1 instead
+    ///         and the caller leaves the box untouched. Anchored stops carry it exactly.
+    Q_INVOKABLE QVariantMap extractSettings() const;
 
     /// The start point the loaded plan was actually built from: the coordinate of its
     /// first coordinate-bearing item, which is the dive in place that opens the pattern
