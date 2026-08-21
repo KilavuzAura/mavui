@@ -63,7 +63,13 @@ jobs:
       # env'e kopyalayip kosullari env uzerinden kuruyoruz.
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      QT_ANDROID_ABIS: ${{ matrix.BuildType == 'Release' && 'armeabi-v7a;arm64-v8a' || 'arm64-v8a' }}
+      # Yalniz 64-bit. armeabi-v7a (32-bit) atildi: ikinci ABI Build adimini
+      # ~20 dk'dan ~37 dk'ya cikariyor, APK'yi 273 MB yapiyor ve alt-derlemesi
+      # calisirken log'a TEK SATIR dusmuyor -- "arm64-v8a.so linking"de takildi
+      # sanilan 19 dakikalik sessizlik buydu (21 Agu, kosu 32466748336: satir
+      # 09:36:44'te dustu, is 09:55:50'de bitti). Kaybedilen: 2015 oncesi
+      # 32-bit cihazlar; hedef tabletler arm64.
+      QT_ANDROID_ABIS: arm64-v8a
 
     steps:
       - name: Checkout repo
