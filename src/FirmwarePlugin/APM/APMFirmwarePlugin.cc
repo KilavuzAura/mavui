@@ -570,6 +570,7 @@ QList<MAV_CMD> APMFirmwarePlugin::supportedMissionCommands(QGCMAVLink::VehicleCl
         // enumerator to name it. The id is all this list carries and MissionCommandUIInfo
         // casts the JSON id the same way, so the cast is the whole story.
         static_cast<MAV_CMD>(31015),        // 31015 - position fix
+        static_cast<MAV_CMD>(31020),        // 31020 - circle (same, no enumerator)
     };
 
     if (vehicleClass == QGCMAVLink::VehicleClassSub) {

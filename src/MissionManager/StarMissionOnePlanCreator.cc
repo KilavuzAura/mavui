@@ -88,6 +88,7 @@ constexpr int kCmdConditionYaw      = 115;
 constexpr int kCmdDoDigicamControl  = 203;
 constexpr int kCmdAuraAnchor        = 31010; // MAV_CMD_USER_1 in the aurapilot ArduSub fork
 constexpr int kCmdAuraPositionFix   = 31015; // MAV_CMD_AURA_POSITION_FIX in the same fork
+constexpr int kCmdAuraCircle        = 31020; // MAV_CMD_AURA_CIRCLE in the same fork
 // Position-fix dwell (param1). 0 is not "advance immediately": the firmware reads it as
 // its own 1 s default, which is what the reset needs to travel through the estimator,
 // AP_InertialNav and the position controller before the next leg is computed from it.
@@ -597,6 +598,12 @@ QVariantMap StarMissionOnePlanCreator::extractSettings() const
             if (cmd == kCmdConditionYaw || cmd == kCmdDoDigicamControl) {
                 continue;
             }
+            // A hand-placed circle carries no coordinate and does not end the stop.
+            // Without this the scan stops here and the photo timing is never read back,
+            // leaving the boxes blank in the plan view.
+            if (cmd == kCmdAuraCircle) {
+                continue;
+            }
             break;
         }
         break;
@@ -698,6 +705,13 @@ QVariantList StarMissionOnePlanCreator::extractTargets() const
                 continue;
             }
             if (cmd == kCmdConditionDelay) {
+                continue;
+            }
+            // Same for a hand-placed circle: it has no coordinate, so it is not the dive
+            // out of this stop. Ending the scan here reported the target as unanchored
+            // and un-photographed, and Finish then regenerated the plan - silently
+            // deleting both the circle and the anchor that followed it.
+            if (cmd == kCmdAuraCircle) {
                 continue;
             }
             // The unanchored path parks a second surface waypoint on the same spot to

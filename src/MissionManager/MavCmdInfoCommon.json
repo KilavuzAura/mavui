@@ -1326,6 +1326,66 @@
                 "min":              0,
                 "max":              100
             }
+        },
+        {
+            "id":           31020,
+            "rawName":      "MAV_CMD_AURA_CIRCLE",
+            "friendlyName": "Circle",
+            "description":  "Flies a circle with CIRCLE mode's parameters carried per item instead of read from the CIRCLE_* parameters. NAV_LOITER_TURNS cannot do this: its storage is full, so its radius is an 8-bit count of metres (2.5 m rounds to 2, 0.5 m becomes 0) and its rate is never per-item. This command carries NO coordinate: the centre is where the vehicle is when the item starts, or - with Centre on next waypoint - the coordinate of the next location-carrying nav command, the same forward search the position fix uses. The rate is an upper bound; AC_Circle also caps it at roughly WP_SPD divided by the radius. Requires the aurapilot ArduSub fork.",
+            "category":     "AURA",
+            "param1": {
+                "label":            "Turns",
+                "default":          1,
+                "decimalPlaces":    2,
+                "min":              0,
+                "max":              655
+            },
+            "param2": {
+                "label":            "Radius (0 = CIRCLE_RADIUS_M)",
+                "units":            "m",
+                "default":          0,
+                "decimalPlaces":    2,
+                "min":              0,
+                "max":              655
+            },
+            "param3": {
+                "label":            "Rate (+CW / -CCW, 0 = CIRCLE_RATE)",
+                "units":            "deg/s",
+                "default":          0,
+                "decimalPlaces":    2,
+                "min":              -327,
+                "max":              327
+            },
+            "param4": {
+                "label":            "Yaw mode",
+                "enumStrings":      "Face centre,Hold entry heading,Fixed heading,Tangent",
+                "enumValues":       "0,1,2,3",
+                "default":          0,
+                "decimalPlaces":    0
+            },
+            "param5": {
+                "label":            "Fixed heading (yaw mode 2 only)",
+                "units":            "deg",
+                "default":          0,
+                "decimalPlaces":    0,
+                "min":              0,
+                "max":              359
+            },
+            "param6": {
+                "label":            "Centre on next waypoint",
+                "enumStrings":      "No,Yes",
+                "enumValues":       "0,1",
+                "default":          0,
+                "decimalPlaces":    0
+            },
+            "param7": {
+                "label":            "Depth (0 = keep current)",
+                "units":            "m",
+                "default":          0,
+                "decimalPlaces":    2,
+                "min":              -655,
+                "max":              0
+            }
         }
     ]
 }
