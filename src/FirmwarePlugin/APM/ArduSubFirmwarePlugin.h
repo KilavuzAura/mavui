@@ -80,6 +80,7 @@ struct APMSubMode
         MANUAL            = 19,
         MOTORDETECTION    = 20,
         SURFTRAK          = 21,  // Surface (seafloor) tracking, aka hold range
+        SMART_RTL         = 22,  // AURA fork: retrace the recorded path back to where we armed
     };
 };
 
@@ -132,6 +133,7 @@ protected:
     const QString _posHoldFlightMode =tr("Position Hold");
     const QString _motorDetectionFlightMode = tr("Motor Detection");
     const QString _surftrakFlightMode = tr("Surftrak");
+    const QString _smartRtlFlightMode = tr("Smart RTL");
 
 private:
     QVariantList _toolIndicators;

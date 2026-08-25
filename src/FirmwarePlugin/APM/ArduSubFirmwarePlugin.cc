@@ -115,6 +115,7 @@ ArduSubFirmwarePlugin::ArduSubFirmwarePlugin(QObject *parent)
         { APMSubMode::POSHOLD           , _posHoldFlightMode        },
         { APMSubMode::MOTORDETECTION    , _motorDetectionFlightMode },
         { APMSubMode::SURFTRAK          , _surftrakFlightMode       },
+        { APMSubMode::SMART_RTL         , _smartRtlFlightMode       },
     });
 
     static FlightModeList availableFlightModes = {
@@ -130,6 +131,7 @@ ArduSubFirmwarePlugin::ArduSubFirmwarePlugin(QObject *parent)
         { _posHoldFlightMode        , APMSubMode::POSHOLD           , true , true },
         { _motorDetectionFlightMode , APMSubMode::MOTORDETECTION    , true , true },
         { _surftrakFlightMode       , APMSubMode::SURFTRAK          , true , true },
+        { _smartRtlFlightMode       , APMSubMode::SMART_RTL         , true , true },
     };
     updateAvailableFlightModes(availableFlightModes);
 
