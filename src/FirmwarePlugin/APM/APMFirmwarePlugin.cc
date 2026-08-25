@@ -575,6 +575,19 @@ QList<MAV_CMD> APMFirmwarePlugin::supportedMissionCommands(QGCMAVLink::VehicleCl
 
     if (vehicleClass == QGCMAVLink::VehicleClassSub) {
         supportedCommands += auraSubCommands;
+
+        // MAV_CMD_DO_SET_MODE ("Set flight mode") ArduSub'da YOKTUR: ne AP_Mission'in
+        // cevirici tablosunda ne de Sub::start_command'da bir karsiligi var. Menude
+        // durmasi bir tuzak, cunku basarisizlik TEK ITEM'LA SINIRLI DEGIL: cevirici
+        // bilinmeyen komuta MAV_MISSION_UNSUPPORTED doner ve MissionItemProtocol ilk
+        // reddedilen item'da TUM aktarimi iptal eder. SITL'de olculdu - 4 item'lik bir
+        // plan gonderildi, araca 2 item indi, ack = 3 (UNSUPPORTED).
+        //
+        // Zaten ArduPilot'ta bir GOREV ITEM'I aracin ucus MODUNU hicbir zaman
+        // degistirmez; en fazla bir AUTO ALT-MODU degistirir (NAV_GUIDED_ENABLE,
+        // AURA_ANCHOR). Yapisal sebebi var: mission.update()'i yalniz ModeAuto::run()
+        // cagirir, yani AUTO'dan cikmak gorevi durdurur.
+        supportedCommands.removeAll(MAV_CMD_DO_SET_MODE);
     }
     if (vehicleClass == QGCMAVLink::VehicleClassGeneric) {
         supportedCommands   += vtolCommands;
