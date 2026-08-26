@@ -1249,7 +1249,7 @@
             "rawName":      "MAV_CMD_USER_1",
             "friendlyName": "Drop anchor",
             "description":  "Anchors the vehicle at its current point. It will not advance to the next waypoint until it has stayed inside the settle radius continuously. The camera work is part of the command: once on station it turns to the heading, waits, fires the shutter, then holds for the duration.",
-            "category":     "AURA",
+            "category":     "Aura Modes",
             "param1": {
                 "label":            "Duration",
                 "units":            "secs",
@@ -1309,7 +1309,7 @@
             "rawName":      "MAV_CMD_AURA_POSITION_FIX",
             "friendlyName": "Position fix",
             "description":  "Snaps the navigation solution onto the NEXT waypoint's coordinate: the vehicle accepts that it is standing on that point, the same operation as SonarView's Set Location. Place it where the vehicle really is on a known point to clear accumulated DVL drift. Horizontal only, depth is untouched. The EKF accepts it only while dead reckoning: with a GPS-class source still fusing (UGPS, GPS_INPUT, SITL's fake GPS) the fix is rejected and the mission carries on with the old solution.",
-            "category":     "AURA",
+            "category":     "Aura Modes",
             "param1": {
                 "label":            "Dwell",
                 "units":            "secs",
@@ -1331,8 +1331,8 @@
             "id":           31020,
             "rawName":      "MAV_CMD_AURA_CIRCLE",
             "friendlyName": "Circle",
-            "description":  "Flies a circle with CIRCLE mode's parameters carried per item instead of read from the CIRCLE_* parameters. NAV_LOITER_TURNS cannot do this: its storage is full, so its radius is an 8-bit count of metres (2.5 m rounds to 2, 0.5 m becomes 0) and its rate is never per-item. This command carries NO coordinate: the centre is where the vehicle is when the item starts, or - with Centre on next waypoint - the coordinate of the next location-carrying nav command, the same forward search the position fix uses. The rate is an upper bound; AC_Circle also caps it at roughly WP_SPD divided by the radius. Requires the aurapilot ArduSub fork.",
-            "category":     "AURA",
+            "description":  "Flies a circle with CIRCLE mode's parameters carried per item instead of read from the CIRCLE_* parameters. Turns 0 = one full turn. Radius 0 = use the CIRCLE_RADIUS_M parameter. Rate: positive is clockwise, negative counter-clockwise, 0 = use the CIRCLE_RATE parameter (its sign included). Fixed heading is only read when Yaw mode is Fixed heading; -1 means no heading was given. Depth is metres above home, so negative is submerged; 0 = hold the depth the vehicle is already at. NAV_LOITER_TURNS cannot do this: its storage is full, so its radius is an 8-bit count of metres (2.5 m rounds to 2, 0.5 m becomes 0) and its rate is never per-item. This command carries NO coordinate: the centre is where the vehicle is when the item starts, or - with Centre on next waypoint - the coordinate of the next location-carrying nav command, the same forward search the position fix uses. The rate is an upper bound; AC_Circle also caps it at roughly WP_SPD divided by the radius. Requires the aurapilot ArduSub fork.",
+            "category":     "Aura Modes",
             "param1": {
                 "label":            "Turns",
                 "default":          1,
@@ -1341,7 +1341,7 @@
                 "max":              655
             },
             "param2": {
-                "label":            "Radius (0 = CIRCLE_RADIUS_M)",
+                "label":            "Radius",
                 "units":            "m",
                 "default":          0,
                 "decimalPlaces":    2,
@@ -1349,7 +1349,7 @@
                 "max":              655
             },
             "param3": {
-                "label":            "Rate (+CW / -CCW, 0 = CIRCLE_RATE)",
+                "label":            "Rate",
                 "units":            "deg/s",
                 "default":          0,
                 "decimalPlaces":    2,
@@ -1364,7 +1364,7 @@
                 "decimalPlaces":    0
             },
             "param5": {
-                "label":            "Fixed heading (yaw mode 2 only)",
+                "label":            "Fixed heading",
                 "units":            "deg",
                 "default":          0,
                 "decimalPlaces":    0,
@@ -1372,14 +1372,14 @@
                 "max":              359
             },
             "param6": {
-                "label":            "Centre on next waypoint",
+                "label":            "Centre on next WP",
                 "enumStrings":      "No,Yes",
                 "enumValues":       "0,1",
                 "default":          0,
                 "decimalPlaces":    0
             },
             "param7": {
-                "label":            "Depth (0 = keep current)",
+                "label":            "Depth",
                 "units":            "m",
                 "default":          0,
                 "decimalPlaces":    2,
