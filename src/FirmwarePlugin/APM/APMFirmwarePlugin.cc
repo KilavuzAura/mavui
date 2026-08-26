@@ -571,6 +571,8 @@ QList<MAV_CMD> APMFirmwarePlugin::supportedMissionCommands(QGCMAVLink::VehicleCl
         // casts the JSON id the same way, so the cast is the whole story.
         static_cast<MAV_CMD>(31015),        // 31015 - position fix
         static_cast<MAV_CMD>(31020),        // 31020 - circle (same, no enumerator)
+        static_cast<MAV_CMD>(31025),        // 31025 - guided mission
+        static_cast<MAV_CMD>(31030),        // 31030 - guided setup
     };
 
     if (vehicleClass == QGCMAVLink::VehicleClassSub) {

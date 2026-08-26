@@ -1386,6 +1386,51 @@
                 "min":              -655,
                 "max":              0
             }
+        },
+        {
+            "id":           31025,
+            "rawName":      "MAV_CMD_AURA_GUIDED_MISSION",
+            "friendlyName": "Guided mission",
+            "description":  "Hands this leg to the companion computer: the vehicle follows SET_POSITION_TARGET_GLOBAL_INT setpoints and the mission waits here. When the setpoints stop for Timeout the mission simply carries on with the next item. Unlike Guided enable there is no need for Guided limits in front of it - and no way for the mission to park here for ever. Timeout 0 = 3 s. Max time 0 = no ceiling, the leg runs as long as setpoints keep arriving. The vehicle stays in AUTO throughout. Requires the aurapilot ArduSub fork.",
+            "category":     "Aura Modes",
+            "param1": {
+                "label":            "Timeout",
+                "units":            "secs",
+                "default":          3,
+                "decimalPlaces":    1,
+                "min":              0,
+                "max":              65
+            },
+            "param2": {
+                "label":            "Max time",
+                "units":            "secs",
+                "default":          0,
+                "decimalPlaces":    0,
+                "min":              0,
+                "max":              65535
+            }
+        },
+        {
+            "id":           31030,
+            "rawName":      "MAV_CMD_AURA_GUIDED_SETUP",
+            "friendlyName": "Guided setup",
+            "description":  "Arms or disarms the guided OVERLAY for the legs that follow. While armed, a live setpoint takes precedence over the waypoint the vehicle is flying: it goes where the companion says, and when the setpoints stop it resumes the very leg it was on. Only NAV_WAYPOINT legs are overridable - an anchor, a circle, a surface or a position fix each mean something the operator asked for precisely. Place another one with Enable off to switch the overlay off from that point on, and another with Enable on to switch it back: it is dynamic. The overlay is also cleared whenever AUTO is entered. Timeout 0 = 3 s. Requires the aurapilot ArduSub fork.",
+            "category":     "Aura Modes",
+            "param1": {
+                "label":            "Enable",
+                "enumStrings":      "Off,On",
+                "enumValues":       "0,1",
+                "default":          1,
+                "decimalPlaces":    0
+            },
+            "param2": {
+                "label":            "Timeout",
+                "units":            "secs",
+                "default":          3,
+                "decimalPlaces":    1,
+                "min":              0,
+                "max":              65
+            }
         }
     ]
 }
