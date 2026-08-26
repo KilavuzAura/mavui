@@ -182,8 +182,19 @@ ApplicationWindow {
 
     property bool _forceClose: false
 
+    // Ekranda ACIK olan kapatma-onayi dialogu sayisi. Alt+F4 (ya da pencere kapatma
+    // dugmesi) bir onay beklerken TEKRAR gelirse bunu ONAY sayariz - bkz. onClosing.
+    //
+    // Neden bayrak degil de SAYAC: kontroller zincirlenebiliyor (gorev kirli ->
+    // "Evet" -> parametre yazimi bekliyor -> ikinci dialog). Dialogun closeFunction'i
+    // onClosed'dan cagriliyor ve o da onAccepted'DAN SONRA calisiyor; yani birinci
+    // dialog kapanirken ikincisi coktan acilmis oluyor. Bayrak olsaydi birinci
+    // dialogun kapanisi, acik duran ikinciyi yok sayarak bayragi temizlerdi.
+    property int _closeDialogCount: 0
+
     function finishCloseProcess() {
         _forceClose = true
+        _closeDialogCount = 0
         // For some reason on the Qml side Qt doesn't automatically disconnect a signal when an object is destroyed.
         // So we have to do it ourselves otherwise the signal flows through on app shutdown to an object which no longer exists.
         firstRunPromptManager.clearNextPromptSignal()
@@ -216,10 +227,12 @@ ApplicationWindow {
 
     function checkForUnsavedMission() {
         if (planView._planMasterController.dirty) {
+            _closeDialogCount++
             showMessageDialog(closeDialogTitle,
                               qsTr("You have a mission edit in progress which has not been saved/sent. If you close you will lose changes. Are you sure you want to close?"),
                               Dialog.Yes | Dialog.No,
-                              function() { _closeChecksToSkip |= _skipUnsavedMissionCheckMask; performCloseChecks() })
+                              function() { _closeChecksToSkip |= _skipUnsavedMissionCheckMask; performCloseChecks() },
+                              function() { _closeDialogCount-- })
             return false
         } else {
             return true
@@ -229,10 +242,12 @@ ApplicationWindow {
     function checkForPendingParameterWrites() {
         for (var index=0; index<QGroundControl.multiVehicleManager.vehicles.count; index++) {
             if (QGroundControl.multiVehicleManager.vehicles.get(index).parameterManager.pendingWrites) {
+                _closeDialogCount++
                 mainWindow.showMessageDialog(closeDialogTitle,
                     qsTr("You have pending parameter updates to a vehicle. If you close you will lose changes. Are you sure you want to close?"),
                     Dialog.Yes | Dialog.No,
-                    function() { _closeChecksToSkip |= _skipPendingParameterWritesCheckMask; performCloseChecks() })
+                    function() { _closeChecksToSkip |= _skipPendingParameterWritesCheckMask; performCloseChecks() },
+                    function() { _closeDialogCount-- })
                 return false
             }
         }
@@ -241,10 +256,12 @@ ApplicationWindow {
 
     function checkForActiveConnections() {
         if (QGroundControl.multiVehicleManager.activeVehicle) {
+            _closeDialogCount++
             mainWindow.showMessageDialog(closeDialogTitle,
                 qsTr("There are still active connections to vehicles. Are you sure you want to exit?"),
                 Dialog.Yes | Dialog.No,
-                function() { _closeChecksToSkip |= _skipActiveConnectionsCheckMask; performCloseChecks() })
+                function() { _closeChecksToSkip |= _skipActiveConnectionsCheckMask; performCloseChecks() },
+                function() { _closeDialogCount-- })
             return false
         } else {
             return true
@@ -252,10 +269,26 @@ ApplicationWindow {
     }
 
     onClosing: (close) => {
-        if (!_forceClose) {
-            _closeChecksToSkip = 0
-            close.accepted = performCloseChecks()
+        if (_forceClose) {
+            return
         }
+
+        // IKINCI kapatma sinyali ONAYDIR.
+        //
+        // Eskiden her onClosing dogrudan performCloseChecks()'e giriyordu. Kontrol
+        // bir onay dialogu acip false donunce pencere kapanmiyor, ama Alt+F4'e
+        // tekrar basildiginda AYNI dialog bir YENISI olarak UST USTE aciliyordu;
+        // kullanici birikmis dialoglari tek tek kapatmak zorunda kaliyordu.
+        // Artik: ilk sinyal sorar, onay beklerken ayni sinyal bir daha gelirse
+        // kapatir.
+        if (_closeDialogCount > 0) {
+            close.accepted = true
+            finishCloseProcess()
+            return
+        }
+
+        _closeChecksToSkip = 0
+        close.accepted = performCloseChecks()
     }
 
     background: Rectangle {
