@@ -1,18 +1,17 @@
 name: Windows
 
 on:
-  # Elle tetikleme: Actions -> Windows -> Run workflow (istenen dal secilir).
-  # MavUI'de otomatik tetik yok; Windows kosusu uzun, sürüm/deneme aninda calistirilir.
+  # Manual trigger: Actions -> Windows -> Run workflow (pick the branch you want).
+  # No automatic trigger in MavUI; the Windows run is long, so it is started manually at release/trial time.
   workflow_dispatch:
   workflow_call:
   push:
     branches:
       - master
       - 'Stable*'
-    # Tag push'unda bu workflow AYRI bir kosu olarak calismaz: v* tag'i
-    # release.yml'i tetikliyor, o da bu dosyayi workflow_call ile cagiriyor.
-    # Ikisi de tetiklenirse ayni is iki kez derleniyordu (21 Agu: tek tag
-    # 11 kosu acti).
+    # This workflow does not run as a SEPARATE run on a tag push: a v* tag
+    # triggers release.yml, which calls this file via workflow_call. When both
+    # fired, the same job was built twice (21 Aug: a single tag opened 11 runs).
     paths-ignore:
       - 'docs/**' # Do not trigger for any changes under docs
   pull_request:
@@ -41,8 +40,9 @@ jobs:
         shell: cmd
 
     env:
-      # custom/cmake/CustomOverrides.cmake QGC_APP_NAME'i MavUI yapiyor, project()
-      # adi oradan geliyor: kurulum dosyasi <proje>-installer.exe olarak dusuyor.
+      # custom/cmake/CustomOverrides.cmake sets QGC_APP_NAME to MavUI and the
+      # project() name comes from there: the installer lands as
+      # <project>-installer.exe.
       ARTIFACT: MavUI-installer.exe
       PACKAGE: MavUI-installer
       QT_VERSION: 6.8.3
@@ -77,13 +77,13 @@ jobs:
         with:
           version: ${{ env.GST_VERSION }}
 
-      # community.chocolatey.org zaman zaman 503/504 donuyor VE bu yolda choco
-      # exit 0 ile cikiyor ("Chocolatey installed 0/0 packages"): adim yesil
-      # gorunuyor, hata 55 dakika sonra `cmake --install` icinde
-      # "Could not find QGC_NSIS_INSTALLER_CMD ... makensis" diye patliyordu
-      # (21 Agu, kosu 32465660925). Uc kez dene, olmazsa kurulumu dogrudan indir,
-      # sonunda makensis'i DOGRULA ve dizini PATH'e ekle -- choco is sirasinda
-      # makine PATH'ini degistirse bile sonraki adimlar onu gormez.
+      # community.chocolatey.org returns 503/504 from time to time AND on that path
+      # choco exits 0 ("Chocolatey installed 0/0 packages"): the step looks green and
+      # the failure blew up 55 minutes later inside `cmake --install` with
+      # "Could not find QGC_NSIS_INSTALLER_CMD ... makensis" (21 Aug, run
+      # 32465660925). Try three times, fall back to downloading the installer
+      # directly, then VERIFY makensis and add its directory to PATH -- even if choco
+      # changes the machine PATH mid-job, later steps will not see it.
       - name: Install NSIS
         shell: pwsh
         run: |

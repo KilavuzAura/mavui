@@ -1,27 +1,26 @@
 name: Linux
 
 on:
-  # Elle tetikleme + release.yml'in cagirabilmesi icin.
+  # For manual triggering and so release.yml can call it.
   workflow_dispatch:
     inputs:
       release_only:
-        description: 'Sadece Release derle (Debug + birim testleri atla)'
+        description: 'Build Release only (skip Debug + unit tests)'
         type: boolean
         default: false
   workflow_call:
     inputs:
       release_only:
-        description: 'Sadece Release derle (Debug + birim testleri atla)'
+        description: 'Build Release only (skip Debug + unit tests)'
         type: boolean
         default: false
   push:
     branches:
       - master
       - 'Stable*'
-    # Tag push'unda bu workflow AYRI bir kosu olarak calismaz: v* tag'i
-    # release.yml'i tetikliyor, o da bu dosyayi workflow_call ile cagiriyor.
-    # Ikisi de tetiklenirse ayni is iki kez derleniyordu (21 Agu: tek tag
-    # 11 kosu acti).
+    # This workflow does not run as a SEPARATE run on a tag push: a v* tag
+    # triggers release.yml, which calls this file via workflow_call. When both
+    # fired, the same job was built twice (21 Aug: a single tag opened 11 runs).
     paths-ignore:
       - 'docs/**' # Do not trigger for any changes under docs
   pull_request:

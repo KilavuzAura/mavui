@@ -182,14 +182,15 @@ ApplicationWindow {
 
     property bool _forceClose: false
 
-    // Ekranda ACIK olan kapatma-onayi dialogu sayisi. Alt+F4 (ya da pencere kapatma
-    // dugmesi) bir onay beklerken TEKRAR gelirse bunu ONAY sayariz - bkz. onClosing.
+    // How many close-confirmation dialogs are OPEN on screen. If Alt+F4 (or the window
+    // close button) arrives AGAIN while a confirmation is pending, we treat that as the
+    // CONFIRMATION - see onClosing.
     //
-    // Neden bayrak degil de SAYAC: kontroller zincirlenebiliyor (gorev kirli ->
-    // "Evet" -> parametre yazimi bekliyor -> ikinci dialog). Dialogun closeFunction'i
-    // onClosed'dan cagriliyor ve o da onAccepted'DAN SONRA calisiyor; yani birinci
-    // dialog kapanirken ikincisi coktan acilmis oluyor. Bayrak olsaydi birinci
-    // dialogun kapanisi, acik duran ikinciyi yok sayarak bayragi temizlerdi.
+    // Why a COUNTER and not a flag: the checks can chain (mission dirty -> "Yes" ->
+    // parameter write pending -> a second dialog). A dialog's closeFunction is invoked
+    // from onClosed, which runs AFTER onAccepted; so by the time the first dialog closes
+    // the second is already open. With a flag, closing the first would clear it and
+    // ignore the second one still standing.
     property int _closeDialogCount: 0
 
     function finishCloseProcess() {
@@ -278,11 +279,11 @@ ApplicationWindow {
         }
     }
 
-    // Kosulsuz kapatma onayi.
+    // Unconditional close confirmation.
     //
-    // Stok QGC, uyarilacak bir sey yoksa (arac bagli degil, kaydedilmemis gorev yok)
-    // pencereyi SORMADAN kapatir. Istenen davranis ise her zaman bir kez sormak ve
-    // ayni kapatma sinyali bir daha gelirse kapatmak - bkz. onClosing.
+    // Stock QGC closes the window WITHOUT ASKING when there is nothing to warn about
+    // (no vehicle connected, no unsaved mission). The wanted behaviour is to always ask
+    // once and to close if the same close signal arrives again - see onClosing.
     function checkForCloseConfirmation() {
         _closeDialogCount++
         showMessageDialog(closeDialogTitle,
@@ -298,14 +299,14 @@ ApplicationWindow {
             return
         }
 
-        // IKINCI kapatma sinyali ONAYDIR.
+        // A SECOND close signal IS THE CONFIRMATION.
         //
-        // Eskiden her onClosing dogrudan performCloseChecks()'e giriyordu. Kontrol
-        // bir onay dialogu acip false donunce pencere kapanmiyor, ama Alt+F4'e
-        // tekrar basildiginda AYNI dialog bir YENISI olarak UST USTE aciliyordu;
-        // kullanici birikmis dialoglari tek tek kapatmak zorunda kaliyordu.
-        // Artik: ilk sinyal sorar, onay beklerken ayni sinyal bir daha gelirse
-        // kapatir.
+        // Previously every onClosing went straight into performCloseChecks(). When a
+        // check opened a confirmation dialog and returned false the window did not
+        // close, but pressing Alt+F4 again opened the SAME dialog AGAIN, STACKED on top
+        // of the first; the user had to dismiss the pile one by one.
+        // Now: the first signal asks, and if the same signal arrives again while the
+        // confirmation is pending, it closes.
         if (_closeDialogCount > 0) {
             close.accepted = true
             finishCloseProcess()

@@ -39,7 +39,7 @@ namespace {
 // thrusters at full and hovers ~0.4 m down, taking the photo underwater. -0.1 m
 // also keeps the depth sensor submerged (hull ~35 cm, sensor at mid height) while
 // the camera on top clears the water. Matches aura_foto_plan_uret.py /
-// gorev_yukle.py (SATIH_DERINLIK).
+// gorev_yukle.py (SATIH_DERINLIK constant).
 constexpr double kSurfaceDepth  = -0.1; // surface waypoint depth (m, negative)
 constexpr int    kTurnSeconds   = 2;    // nominal padding added to both window and queue
 // Worst-case camera turn, used only on the unanchored path to size the photo window.

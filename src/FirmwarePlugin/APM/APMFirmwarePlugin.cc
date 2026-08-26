@@ -578,17 +578,18 @@ QList<MAV_CMD> APMFirmwarePlugin::supportedMissionCommands(QGCMAVLink::VehicleCl
     if (vehicleClass == QGCMAVLink::VehicleClassSub) {
         supportedCommands += auraSubCommands;
 
-        // MAV_CMD_DO_SET_MODE ("Set flight mode") ArduSub'da YOKTUR: ne AP_Mission'in
-        // cevirici tablosunda ne de Sub::start_command'da bir karsiligi var. Menude
-        // durmasi bir tuzak, cunku basarisizlik TEK ITEM'LA SINIRLI DEGIL: cevirici
-        // bilinmeyen komuta MAV_MISSION_UNSUPPORTED doner ve MissionItemProtocol ilk
-        // reddedilen item'da TUM aktarimi iptal eder. SITL'de olculdu - 4 item'lik bir
-        // plan gonderildi, araca 2 item indi, ack = 3 (UNSUPPORTED).
+        // MAV_CMD_DO_SET_MODE ("Set flight mode") DOES NOT EXIST on ArduSub: it has no
+        // entry in AP_Mission's converter table nor in Sub::start_command. Leaving it in
+        // the menu is a trap, because the failure IS NOT LIMITED TO ONE ITEM: the
+        // converter returns MAV_MISSION_UNSUPPORTED for an unknown command and
+        // MissionItemProtocol aborts the WHOLE transfer at the first rejected item.
+        // Measured in SITL - a 4-item plan was sent, 2 items reached the vehicle,
+        // ack = 3 (UNSUPPORTED).
         //
-        // Zaten ArduPilot'ta bir GOREV ITEM'I aracin ucus MODUNU hicbir zaman
-        // degistirmez; en fazla bir AUTO ALT-MODU degistirir (NAV_GUIDED_ENABLE,
-        // AURA_ANCHOR). Yapisal sebebi var: mission.update()'i yalniz ModeAuto::run()
-        // cagirir, yani AUTO'dan cikmak gorevi durdurur.
+        // In any case a MISSION ITEM in ArduPilot never changes the vehicle's flight
+        // MODE; at most it changes an AUTO SUB-MODE (NAV_GUIDED_ENABLE, AURA_ANCHOR).
+        // There is a structural reason: only ModeAuto::run() calls mission.update(), so
+        // leaving AUTO stops the mission.
         supportedCommands.removeAll(MAV_CMD_DO_SET_MODE);
     }
     if (vehicleClass == QGCMAVLink::VehicleClassGeneric) {

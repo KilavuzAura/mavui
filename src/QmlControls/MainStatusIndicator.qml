@@ -215,16 +215,6 @@ RowLayout {
 
             SettingsGroupLayout {
                 //Layout.fillWidth:   true
-                heading:            qsTr("Vehicle Messages")
-                visible:            !vehicleMessageList.noMessages
-
-                VehicleMessageList { 
-                    id: vehicleMessageList
-                }
-            }
-
-            SettingsGroupLayout {
-                //Layout.fillWidth:   true
                 heading:            qsTr("Sensor Status")
                 visible:            !_healthAndArmingChecksSupported
 
@@ -243,6 +233,16 @@ RowLayout {
                         model: _activeVehicle.sysStatusSensorInfo.sensorStatus
                         QGCLabel { text: modelData }
                     }
+                }
+            }
+
+            SettingsGroupLayout {
+                //Layout.fillWidth:   true
+                heading:            qsTr("Vehicle Messages")
+                visible:            !vehicleMessageList.noMessages
+
+                VehicleMessageList { 
+                    id: vehicleMessageList
                 }
             }
 

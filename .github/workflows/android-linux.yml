@@ -1,17 +1,16 @@
 name: Android-Linux
 
 on:
-  # Elle tetikleme + release.yml'in cagirabilmesi icin.
+  # For manual triggering and so release.yml can call it.
   workflow_dispatch:
   workflow_call:
   push:
     branches:
       - master
       - 'Stable*'
-    # Tag push'unda bu workflow AYRI bir kosu olarak calismaz: v* tag'i
-    # release.yml'i tetikliyor, o da bu dosyayi workflow_call ile cagiriyor.
-    # Ikisi de tetiklenirse ayni is iki kez derleniyordu (21 Agu: tek tag
-    # 11 kosu acti).
+    # This workflow does not run as a SEPARATE run on a tag push: a v* tag
+    # triggers release.yml, which calls this file via workflow_call. When both
+    # fired, the same job was built twice (21 Aug: a single tag opened 11 runs).
     paths-ignore:
       - 'docs/**' # Do not trigger for any changes under docs
   pull_request:
@@ -31,10 +30,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Bilinen iyi sure ~37 dk (Build adimi, iki ABI). CPM/FetchContent'in
-    # indirmelerinde zaman asimi yok: codeload takilirsa is 6 saatlik
-    # varsayilan sinira kadar asili kaliyor (21 Agu: 47 dk sonra hala Build).
-    # 75 dk'da kes, hata hemen gorunsun.
+    # The known-good duration is ~37 min (Build step, two ABIs). CPM/FetchContent
+    # downloads have no timeout: if codeload stalls, the job hangs until the 6-hour
+    # default limit (21 Aug: still in Build after 47 min). Cut it off at 75 min so
+    # the failure shows up immediately.
     timeout-minutes: 75
 
     strategy:
@@ -49,26 +48,27 @@ jobs:
       ARTIFACT: MavUI.apk
       PACKAGE: MavUI-android
       QT_VERSION: 6.8.3
-      # MavUI kendi anahtariyla imzalanir: tablette kurulu surumun uzerine guncelleme
-      # gidebilmesi icin imza yerel build.sh'in kullandigi keystore ile ayni olmali.
-      # Keystore repoya konmaz, ANDROID_KEYSTORE_BASE64 secret'indan yazilir; secret
-      # yoksa APK imzasiz cikar (cihaza kurulmaz, yalniz arsiv degeri tasir).
+      # MavUI is signed with its own key: for an update to install over the version
+      # already on the tablet, the signature must match the keystore that the local
+      # build.sh uses. The keystore is not committed; it is written from the
+      # ANDROID_KEYSTORE_BASE64 secret. Without the secret the APK comes out unsigned
+      # (it will not install on a device and is only of archival value).
       QT_ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/mavui.keystore
       QT_ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS || 'mavui' }}
       QT_ANDROID_KEYSTORE_STORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       QT_ANDROID_KEYSTORE_KEY_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      # secrets baglami if: icinde OKUNAMAZ (yalniz env/with/run). Dogrudan
-      # "if: secrets.X != ''" yazmak dosyayi ayristirilamaz yapiyor: is hic
-      # baslamiyor, kosu 0 sn'de "workflow file issue" ile dusuyordu. Sirri
-      # env'e kopyalayip kosullari env uzerinden kuruyoruz.
+      # The secrets context is NOT READABLE inside if: (only in env/with/run).
+      # Writing "if: secrets.X != ''" directly makes the file unparseable: the job
+      # never starts and the run failed in 0 s with "workflow file issue". We copy
+      # the secret into env and build the conditions off env instead.
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      # Yalniz 64-bit. armeabi-v7a (32-bit) atildi: ikinci ABI Build adimini
-      # ~20 dk'dan ~37 dk'ya cikariyor, APK'yi 273 MB yapiyor ve alt-derlemesi
-      # calisirken log'a TEK SATIR dusmuyor -- "arm64-v8a.so linking"de takildi
-      # sanilan 19 dakikalik sessizlik buydu (21 Agu, kosu 32466748336: satir
-      # 09:36:44'te dustu, is 09:55:50'de bitti). Kaybedilen: 2015 oncesi
-      # 32-bit cihazlar; hedef tabletler arm64.
+      # 64-bit only. armeabi-v7a (32-bit) was dropped: the second ABI takes the
+      # Build step from ~20 min to ~37 min, makes the APK 273 MB, and while its
+      # sub-build runs NOT ONE LINE reaches the log -- that was the 19 minutes of
+      # silence mistaken for a hang at "arm64-v8a.so linking" (21 Aug, run
+      # 32466748336: the line landed at 09:36:44, the job finished at 09:55:50).
+      # What is lost: pre-2015 32-bit devices; the target tablets are arm64.
       QT_ANDROID_ABIS: arm64-v8a
 
     steps:

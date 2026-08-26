@@ -1,13 +1,14 @@
 name: Release
 
-# Uc platformu tek kosuda derler ve ciktilarini tek GitHub Release'e asar.
+# Builds three platforms in one run and uploads their artifacts to a single
+# GitHub Release.
 #
-#   v1.2.3 gibi bir tag push edilince  -> taslak Release olusur, dosyalar eklenir
-#   Actions -> Release -> Run workflow -> yalniz derler; "tag" alani doldurulursa
-#                                         o tag'e Release acar
+#   pushing a tag like v1.2.3        -> a draft Release is created and files added
+#   Actions -> Release -> Run workflow -> builds only; if the "tag" field is filled
+#                                         in, it opens a Release for that tag
 #
-# Dosyalar taslak (draft) Release'e dusuyor: yayinlamadan once icerigi gozden
-# gecirip "Publish release" demek gerekiyor.
+# The files land in a draft Release: before publishing you have to review the
+# contents and press "Publish release".
 
 on:
   push:
@@ -50,10 +51,10 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Ne toplandi
+      - name: What was collected
         run: ls -lR artifacts
 
-      - name: Release'e as
+      - name: Upload to the Release
         if: ${{ github.ref_type == 'tag' || inputs.tag != '' }}
         uses: softprops/action-gh-release@v2
         with:

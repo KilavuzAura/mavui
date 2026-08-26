@@ -1089,7 +1089,7 @@ Item {
 
                     QGCCheckBox {
                         id:      starMissionReturnHomeCheck
-                        text:    qsTr("Başlangıca dön")
+                        text:    qsTr("Return to start")
                         // Off by default: the mission ends on the last stop and the vehicle
                         // holds there at the surface, where the crew can pick it up. Ticked,
                         // the plan closes with a dive in place, a submerged leg back to the
@@ -1098,7 +1098,7 @@ Item {
                         checked: false
                     }
 
-                    QGCLabel { text: qsTr("Foto öncesi (sn)") }
+                    QGCLabel { text: qsTr("Pre-photo (s)") }
 
                     QGCTextField {
                         id:                     starMissionPhotoBeforeField
@@ -1108,7 +1108,7 @@ Item {
                         // Mission One value shown as the placeholder.
                     }
 
-                    QGCLabel { text: qsTr("Foto penceresi (sn)") }
+                    QGCLabel { text: qsTr("Photo window (s)") }
 
                     QGCTextField {
                         id:                     starMissionPhotoWindowField
@@ -1129,7 +1129,7 @@ Item {
                     Layout.alignment:   Qt.AlignHCenter
                     spacing:            ScreenTools.defaultFontPixelWidth
 
-                    QGCLabel { text: qsTr("Başlangıç beklemesi (sn)") }
+                    QGCLabel { text: qsTr("Start hold (s)") }
 
                     QGCTextField {
                         id:                     starMissionStartWaitField
@@ -1140,7 +1140,7 @@ Item {
                         // the hold and the position fix together.
                     }
 
-                    QGCLabel { text: qsTr("Dalış beklemesi (sn)") }
+                    QGCLabel { text: qsTr("Dive settle (s)") }
 
                     QGCTextField {
                         id:                     starMissionDiveSettleField
@@ -1482,7 +1482,7 @@ Item {
             property string photoWindowText: ""     ///< hold on the photo-window waypoint (s)
             property string startWaitText:   ""     ///< hold on the start point before the position fix (s)
             property string diveSettleText:  ""     ///< hold on every dive-in-place waypoint (s)
-            property bool   returnHome:      false  ///< banner "Başlangıca dön" seeds the checkbox below
+            property bool   returnHome:      false  ///< banner "Return to start" seeds the checkbox below
             property int    wpCount:    0       ///< rows; sized on completion, grown by "+ Waypoint"
 
             // Size the table only once createObject has applied seedTargets. Binding
@@ -1693,13 +1693,13 @@ Item {
                     }
                 }
 
-                // Foto zamanlaması: üretilen plandaki iki bekleme. Boş bırakılırsa
-                // varsayılanlar (3 / 5 sn) kullanılır — elle doğrulanmış planla aynı.
+                // Photo timing: the two holds in the generated plan. Left empty, the
+                // defaults (3 / 5 s) apply - the same as the hand-verified plan.
                 RowLayout {
                     spacing:            ScreenTools.defaultFontPixelWidth
                     Layout.fillWidth:   true
 
-                    QGCLabel { text: qsTr("Foto öncesi (sn)") }
+                    QGCLabel { text: qsTr("Pre-photo (s)") }
 
                     QGCTextField {
                         id:                     photoBeforeField
@@ -1712,7 +1712,7 @@ Item {
 
                     Item { Layout.fillWidth: true }
 
-                    QGCLabel { text: qsTr("Foto penceresi (sn)") }
+                    QGCLabel { text: qsTr("Photo window (s)") }
 
                     QGCTextField {
                         id:                     photoWindowField
@@ -1726,13 +1726,13 @@ Item {
                     }
                 }
 
-                // Başlangıç kapısı ve dalış beklemesi. Boş bırakılırsa App Settings ->
-                // Mission One değerleri (10 / 5 sn) kullanılır.
+                // Start gate and dive settle. Left empty, the App Settings ->
+                // Mission One values (10 / 5 s) apply.
                 RowLayout {
                     spacing:            ScreenTools.defaultFontPixelWidth
                     Layout.fillWidth:   true
 
-                    QGCLabel { text: qsTr("Başlangıç beklemesi (sn)") }
+                    QGCLabel { text: qsTr("Start hold (s)") }
 
                     QGCTextField {
                         id:                     startWaitField
@@ -1747,7 +1747,7 @@ Item {
 
                     Item { Layout.fillWidth: true }
 
-                    QGCLabel { text: qsTr("Dalış beklemesi (sn)") }
+                    QGCLabel { text: qsTr("Dive settle (s)") }
 
                     QGCTextField {
                         id:                     diveSettleField
@@ -1765,7 +1765,7 @@ Item {
 
                     QGCCheckBox {
                         id:         returnHomeCheck
-                        text:       qsTr("Başlangıca dön (son hedeften sonra)")
+                        text:       qsTr("Return to start (after the last target)")
                         checked:    returnHome
                         // Unticked (default): the plan ends on the last stop - the vehicle
                         // surfaces, takes its photo and stays there. Ticked: dive in place,
