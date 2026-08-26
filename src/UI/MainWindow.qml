@@ -208,6 +208,7 @@ ApplicationWindow {
     readonly property int _skipUnsavedMissionCheckMask: 0x01
     readonly property int _skipPendingParameterWritesCheckMask: 0x02
     readonly property int _skipActiveConnectionsCheckMask: 0x04
+    readonly property int _skipCloseConfirmCheckMask: 0x08
     property int _closeChecksToSkip: 0
     function performCloseChecks() {
         if (!(_closeChecksToSkip & _skipUnsavedMissionCheckMask) && !checkForUnsavedMission()) {
@@ -217,6 +218,15 @@ ApplicationWindow {
             return false
         }
         if (!(_closeChecksToSkip & _skipActiveConnectionsCheckMask) && !checkForActiveConnections()) {
+            return false
+        }
+        // Genel kapatma onayi EN SONDA ve YALNIZCA yukaridakilerin hicbiri sormadiysa.
+        //
+        // _closeChecksToSkip sifirdan farkliysa ozgul kontrollerden en az biri
+        // tetiklenmis ve kullanici onu onaylamis demektir; ayni kapatma icin ikinci
+        // kez sormak gereksiz. Kendi maskesi de burada is goruyor: genel onaya
+        // "Evet" denince maske 0x08 olur, sifir olmaktan cikar ve tekrar sorulmaz.
+        if (_closeChecksToSkip == 0 && !checkForCloseConfirmation()) {
             return false
         }
         finishCloseProcess()
@@ -266,6 +276,21 @@ ApplicationWindow {
         } else {
             return true
         }
+    }
+
+    // Kosulsuz kapatma onayi.
+    //
+    // Stok QGC, uyarilacak bir sey yoksa (arac bagli degil, kaydedilmemis gorev yok)
+    // pencereyi SORMADAN kapatir. Istenen davranis ise her zaman bir kez sormak ve
+    // ayni kapatma sinyali bir daha gelirse kapatmak - bkz. onClosing.
+    function checkForCloseConfirmation() {
+        _closeDialogCount++
+        showMessageDialog(closeDialogTitle,
+                          qsTr("Are you sure you want to close %1?").arg(QGroundControl.appName),
+                          Dialog.Yes | Dialog.No,
+                          function() { _closeChecksToSkip |= _skipCloseConfirmCheckMask; performCloseChecks() },
+                          function() { _closeDialogCount-- })
+        return false
     }
 
     onClosing: (close) => {
