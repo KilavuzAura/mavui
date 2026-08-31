@@ -24,12 +24,14 @@ Item {
     width:  image.width
     height: image.height
 
+    property bool _useOverlay: color !== "transparent" && color.a > 0
+
     Image {
         id:                 image
         smooth:             true
         mipmap:             true
         antialiasing:       true
-        visible:            false
+        visible:            !_useOverlay
         fillMode:           Image.PreserveAspectFit
         anchors.fill:       parent
         sourceSize.height:  height
@@ -39,5 +41,6 @@ Item {
         anchors.fill:       image
         source:             image
         color:              parent.color
+        visible:            _useOverlay
     }
 }

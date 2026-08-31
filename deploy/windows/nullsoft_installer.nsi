@@ -147,7 +147,7 @@ Section "Uninstall"
   SetShellVarContext current
   ${If} $R1 != 1
     RMDir /r /REBOOTOK "$APPDATA\${ORGNAME}\"
-  ${Endif}
+  Delete "$DESKTOP\${APPNAME}.lnk"
   DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}"
   DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\${EXENAME}.exe"
   ; NOTE: We specifically do not delete the driver version key since we need it to persist around uninstalls
@@ -157,10 +157,18 @@ Section "create Start Menu Shortcuts"
   SetRegView 64
   SetShellVarContext all
   CreateDirectory "$SMPROGRAMS\$StartMenuFolder"
-  CreateShortCut "$SMPROGRAMS\$StartMenuFolder\${APPNAME}.lnk" "$INSTDIR\bin\${EXENAME}.exe" "" "$INSTDIR\bin\${EXENAME}.exe" 0
-  CreateShortCut "$SMPROGRAMS\$StartMenuFolder\${APPNAME} (GPU Compatibility Mode).lnk" "$INSTDIR\bin\${EXENAME}.exe" "-desktop" "$INSTDIR\bin\${EXENAME}.exe" 0
+
+  ${If} ${FileExists} "$INSTDIR\bin\${EXENAME}.exe"
+    StrCpy $1 "$INSTDIR\bin\${EXENAME}.exe"
+  ${Else}
+    StrCpy $1 "$INSTDIR\${EXENAME}.exe"
+  ${EndIf}
+
+  CreateShortCut "$SMPROGRAMS\$StartMenuFolder\${APPNAME}.lnk" "$1" "" "$1" 0
+  CreateShortCut "$DESKTOP\${APPNAME}.lnk" "$1" "" "$1" 0
+  CreateShortCut "$SMPROGRAMS\$StartMenuFolder\${APPNAME} (GPU Compatibility Mode).lnk" "$1" "-desktop" "$1" 0
   !insertmacro DemoteShortCut "$SMPROGRAMS\$StartMenuFolder\${APPNAME} (GPU Compatibility Mode).lnk"
-  CreateShortCut "$SMPROGRAMS\$StartMenuFolder\${APPNAME} (GPU Safe Mode).lnk" "$INSTDIR\bin\${EXENAME}.exe" "-swrast" "$INSTDIR\bin\${EXENAME}.exe" 0
+  CreateShortCut "$SMPROGRAMS\$StartMenuFolder\${APPNAME} (GPU Safe Mode).lnk" "$1" "-swrast" "$1" 0
   !insertmacro DemoteShortCut "$SMPROGRAMS\$StartMenuFolder\${APPNAME} (GPU Safe Mode).lnk"
 SectionEnd
 

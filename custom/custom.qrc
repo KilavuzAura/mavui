@@ -13,10 +13,11 @@
          The alias names keep the upstream spelling because they ARE the paths the
          application asks for; only what they point at is ours. -->
     <qresource prefix="/res">
-        <file alias="QGCLogoFull.svg">res/AuraLogo.svg</file>
-        <file alias="QGCLogoWhite.svg">res/AuraLogo.svg</file>
-        <file alias="QGCLogoWhite">res/AuraLogo.svg</file>
-        <file alias="QGCLogoBlack.svg">res/AuraLogo.svg</file>
+        <file alias="QGCLogoFull.svg">res/Images/AuraLogo.png</file>
+        <file alias="QGCLogoWhite.svg">res/Images/AuraLogo.png</file>
+        <file alias="QGCLogoWhite">res/Images/AuraLogo.png</file>
+        <file alias="QGCLogoBlack.svg">res/Images/AuraLogo.png</file>
         <file alias="qgroundcontrol.ico">res/icons/MavUI.ico</file>
+        <file alias="SplashScreen">res/Images/AuraLogo.png</file>
     </qresource>
 </RCC>

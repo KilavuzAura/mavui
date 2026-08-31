@@ -145,15 +145,19 @@ QGCApplication::QGCApplication(int &argc, char *argv[], bool unitTesting, bool s
 #endif
     }
     setApplicationName(applicationName);
+    setApplicationDisplayName(applicationName);
     setOrganizationName(QGC_ORG_NAME);
     setOrganizationDomain(QGC_ORG_DOMAIN);
     setApplicationVersion(QString(QGC_APP_VERSION_STR));
-#ifdef Q_OS_LINUX
 #ifdef QGC_CUSTOM_BUILD
-    setWindowIcon(QIcon(":/custom/img/AuraLogo.png"));
+    QIcon appIcon;
+    appIcon.addFile(":/custom/img/AuraLogo.png");
+    appIcon.addFile(":/res/qgroundcontrol.ico");
+    setWindowIcon(appIcon);
 #else
     setWindowIcon(QIcon(":/res/qgroundcontrol.ico"));
 #endif
+#ifdef Q_OS_LINUX
     // Wayland compositors resolve the taskbar/alt-tab icon through the app_id,
     // which Qt derives from the desktop file name.
     setDesktopFileName(QStringLiteral(QGC_APP_NAME));
